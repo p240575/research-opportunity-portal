@@ -1,182 +1,366 @@
 {
   "info": {
     "_postman_id": "a98c56e0-2b1d-4f01-9a7c-c8525b4fa61e",
-    "name": "University Research Opportunity Portal API",
-    "description": "Postman test collection for CN Assignment #1 - FAST-NUCES Peshawar.\nCovers all 8 required assignment demonstration scenarios including CRUD, Status Codes (200, 201, 400, 404), and validation.",
+    "name": "University Research Opportunity Portal API (with RBAC & Auth)",
+    "description": "Comprehensive Postman test collection for CN Assignment #1 - FAST-NUCES Peshawar.\nCovers public visitor read-only access, secure admin authentication, authorization checks (401 Unauthorized), CRUD operations, status codes (200, 201, 400, 401, 404), and validation.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "1. Create Opportunity #1 (Networks & AI)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"title\": \"AI-Driven Traffic Optimization for Software Defined Networks\",\n  \"description\": \"Investigating deep reinforcement learning algorithms to dynamically route packet flows and minimize latency in enterprise SDN topologies.\",\n  \"research_area\": \"Computer Networks & AI\",\n  \"faculty_name\": \"Dr. Tariq Khan\",\n  \"department\": \"Computer Science\",\n  \"required_skills\": \"Python, Mininet, PyTorch, SDN / OpenFlow\",\n  \"available_positions\": 2,\n  \"deadline\": \"2026-11-30\",\n  \"status\": \"Open\"\n}"
+      "name": "1. Public Access (Visitor)",
+      "item": [
+        {
+          "name": "1.1 Retrieve All Opportunities (Public / Visitor)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/opportunities",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities"]
+            },
+            "description": "Publicly accessible to any unauthenticated visitor without login or credentials. Expected response: 200 OK."
+          }
         },
-        "url": {
-          "raw": "{{base_url}}/api/opportunities",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities"]
+        {
+          "name": "1.2 Retrieve Single Opportunity by ID (Public / Visitor)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/opportunities/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities", "1"]
+            },
+            "description": "Publicly retrieves full details of an opportunity for visitors. Expected response: 200 OK."
+          }
         },
-        "description": "Creates first research opportunity. Expected response: 201 Created."
-      }
+        {
+          "name": "1.3 Check Auth Status (Unauthenticated Visitor)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "status"]
+            },
+            "description": "Verifies that visitors are recognized with role 'visitor' and authenticated: false. Expected response: 200 OK."
+          }
+        }
+      ]
     },
     {
-      "name": "2. Create Opportunity #2 (Cybersecurity IoT)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"title\": \"Zero-Trust Security Architectures for Edge IoT Devices\",\n  \"description\": \"Designing lightweight mutual authentication and continuous verification protocols for resource-constrained IoT gateways in smart campus deployments.\",\n  \"research_area\": \"Cybersecurity\",\n  \"faculty_name\": \"Dr. Ayesha Siddiqa\",\n  \"department\": \"Computer Science\",\n  \"required_skills\": \"C/C++, Cryptography basics, Network Security, Wireshark\",\n  \"available_positions\": 3,\n  \"deadline\": \"2026-12-15\",\n  \"status\": \"Open\"\n}"
+      "name": "2. Security & Authorization Enforcement (401 Rejections)",
+      "item": [
+        {
+          "name": "2.1 Reject Unauthenticated POST (Visitor Creating Opportunity)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Unauthorized Opportunity Creation\",\n  \"description\": \"Attempt by an unauthenticated visitor to post data.\",\n  \"research_area\": \"Security\",\n  \"faculty_name\": \"Dr. Anonymous\",\n  \"department\": \"Computer Science\",\n  \"required_skills\": \"None\",\n  \"available_positions\": 1,\n  \"deadline\": \"2026-12-31\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities"]
+            },
+            "description": "Must be rejected by backend authorization middleware. Expected response: 401 Unauthorized."
+          }
         },
-        "url": {
-          "raw": "{{base_url}}/api/opportunities",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities"]
+        {
+          "name": "2.2 Reject Unauthenticated PUT (Visitor Updating Opportunity)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Malicious Unauthorized Edit\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities", "1"]
+            },
+            "description": "Must be rejected by backend authorization middleware. Expected response: 401 Unauthorized."
+          }
         },
-        "description": "Creates second research opportunity. Expected response: 201 Created."
-      }
+        {
+          "name": "2.3 Reject Unauthenticated DELETE (Visitor Deleting Opportunity)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/opportunities/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities", "1"]
+            },
+            "description": "Must be rejected by backend authorization middleware. Expected response: 401 Unauthorized."
+          }
+        },
+        {
+          "name": "2.4 Reject Invalid Admin Login Credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"WrongPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Rejects incorrect password. Expected response: 401 Unauthorized."
+          }
+        }
+      ]
     },
     {
-      "name": "3. Create Opportunity #3 (Data Science & Healthcare)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"title\": \"Federated Learning for Privacy-Preserving Medical Telemetry\",\n  \"description\": \"Developing decentralized model training frameworks across hospital edge nodes while ensuring zero patient biometric data leakage.\",\n  \"research_area\": \"Machine Learning\",\n  \"faculty_name\": \"Dr. Usman Farooq\",\n  \"department\": \"Data Science\",\n  \"required_skills\": \"Python, TensorFlow Federated, Differential Privacy\",\n  \"available_positions\": 1,\n  \"deadline\": \"2026-11-20\",\n  \"status\": \"Open\"\n}"
+      "name": "3. Admin Authentication & Session Management",
+      "item": [
+        {
+          "name": "3.1 Valid Administrator Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set('admin_token', jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"AdminPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticates admin and returns session token. Expected response: 200 OK."
+          }
         },
-        "url": {
-          "raw": "{{base_url}}/api/opportunities",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities"]
-        },
-        "description": "Creates third research opportunity. Expected response: 201 Created."
-      }
+        {
+          "name": "3.2 Verify Authenticated Admin Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "status"]
+            },
+            "description": "Verifies that token is active and admin is authenticated. Expected response: 200 OK."
+          }
+        }
+      ]
     },
     {
-      "name": "4. Retrieve All Research Opportunities",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/opportunities",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities"]
+      "name": "4. Protected Administrative Operations (Admin Only)",
+      "item": [
+        {
+          "name": "4.1 Create Opportunity #1 (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"AI-Driven Traffic Optimization for Software Defined Networks\",\n  \"description\": \"Investigating deep reinforcement learning algorithms to dynamically route packet flows and minimize latency in enterprise SDN topologies.\",\n  \"research_area\": \"Computer Networks & AI\",\n  \"faculty_name\": \"Dr. Tariq Khan\",\n  \"department\": \"Computer Science\",\n  \"required_skills\": \"Python, Mininet, PyTorch, SDN / OpenFlow\",\n  \"available_positions\": 2,\n  \"deadline\": \"2026-11-30\",\n  \"status\": \"Open\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities"]
+            },
+            "description": "Admin creates opportunity. Expected response: 201 Created."
+          }
         },
-        "description": "Retrieves all research opportunities in database. Expected response: 200 OK."
-      }
+        {
+          "name": "4.2 Create Opportunity #2 (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Zero-Trust Security Architectures for Edge IoT Devices\",\n  \"description\": \"Designing lightweight mutual authentication and continuous verification protocols for resource-constrained IoT gateways in smart campus deployments.\",\n  \"research_area\": \"Cybersecurity\",\n  \"faculty_name\": \"Dr. Ayesha Siddiqa\",\n  \"department\": \"Computer Science\",\n  \"required_skills\": \"C/C++, Cryptography basics, Network Security, Wireshark\",\n  \"available_positions\": 3,\n  \"deadline\": \"2026-12-15\",\n  \"status\": \"Open\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities"]
+            },
+            "description": "Admin creates opportunity. Expected response: 201 Created."
+          }
+        },
+        {
+          "name": "4.3 Update Existing Opportunity (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"AI-Driven SDN Optimization with P4 Programmable Data Planes\",\n  \"available_positions\": 4,\n  \"deadline\": \"2026-12-30\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities", "1"]
+            },
+            "description": "Admin updates opportunity. Expected response: 200 OK."
+          }
+        },
+        {
+          "name": "4.4 Toggle Status Open to Closed (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Closed\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities", "1"]
+            },
+            "description": "Admin toggles opportunity status. Expected response: 200 OK."
+          }
+        },
+        {
+          "name": "4.5 Delete Opportunity (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/opportunities/4",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities", "4"]
+            },
+            "description": "Admin deletes opportunity. Expected response: 200 OK (or 404 if ID was already removed)."
+          }
+        },
+        {
+          "name": "4.6 Input Validation Failure (400 Bad Request)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Incomplete Opportunity\",\n  \"available_positions\": -5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities"]
+            },
+            "description": "Validates data validation rejection for malformed fields. Expected response: 400 Bad Request."
+          }
+        },
+        {
+          "name": "4.7 Request Non-Existent Opportunity (404 Not Found)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/opportunities/99999",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities", "99999"]
+            },
+            "description": "Tests 404 response on deleted or non-existent ID. Expected response: 404 Not Found."
+          }
+        }
+      ]
     },
     {
-      "name": "5. Retrieve One Opportunity by ID",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/opportunities/1",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities", "1"]
+      "name": "5. Admin Logout & Post-Logout Verification",
+      "item": [
+        {
+          "name": "5.1 Admin Logout (Invalidate Session)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Invalidates administrative session and token. Expected response: 200 OK."
+          }
         },
-        "description": "Retrieves details of opportunity with ID 1. Expected response: 200 OK."
-      }
-    },
-    {
-      "name": "6. Update Existing Opportunity",
-      "request": {
-        "method": "PUT",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"title\": \"AI-Driven SDN Optimization with P4 Programmable Data Planes\",\n  \"available_positions\": 4,\n  \"deadline\": \"2026-12-30\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/opportunities/1",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities", "1"]
-        },
-        "description": "Updates title, seats, and deadline for opportunity ID 1. Expected response: 200 OK."
-      }
-    },
-    {
-      "name": "7. Change Status from Open to Closed",
-      "request": {
-        "method": "PUT",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"status\": \"Closed\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/opportunities/1",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities", "1"]
-        },
-        "description": "Toggles status of opportunity 1 to Closed. Expected response: 200 OK."
-      }
-    },
-    {
-      "name": "8. Delete an Opportunity",
-      "request": {
-        "method": "DELETE",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/opportunities/3",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities", "3"]
-        },
-        "description": "Deletes opportunity ID 3. Expected response: 200 OK."
-      }
-    },
-    {
-      "name": "9. Verify Deleted Opportunity (404 Not Found)",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/opportunities/3",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities", "3"]
-        },
-        "description": "Requests deleted opportunity ID 3 to verify 404 response. Expected response: 404 Not Found."
-      }
-    },
-    {
-      "name": "10. Input Validation Failure (400 Bad Request)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"title\": \"Incomplete Opportunity\",\n  \"available_positions\": -5\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/opportunities",
-          "host": ["{{base_url}}"],
-          "path": ["api", "opportunities"]
-        },
-        "description": "Sends request with missing required fields and negative positions. Expected response: 400 Bad Request."
-      }
+        {
+          "name": "5.2 Reject Operations with Invalidated Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Attempted Post After Logout\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/opportunities",
+              "host": ["{{base_url}}"],
+              "path": ["api", "opportunities"]
+            },
+            "description": "Verifies that token is dead and operations are rejected. Expected response: 401 Unauthorized."
+          }
+        }
+      ]
     }
   ],
   "variable": [
     {
       "key": "base_url",
       "value": "http://127.0.0.1:5000",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
       "type": "string"
     }
   ]

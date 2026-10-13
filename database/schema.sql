@@ -30,6 +30,20 @@ CREATE TABLE IF NOT EXISTS research_opportunities (
     INDEX idx_area (research_area)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 3. Create Administrators Table (For Secure Admin Authentication)
+CREATE TABLE IF NOT EXISTS admins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(150) DEFAULT 'Portal Administrator',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Seed Default Administrator (username: admin / password: AdminPassword123!)
+INSERT INTO admins (username, password_hash, full_name)
+SELECT 'admin', 'scrypt:32768:8:1$yN3k4GH55j6UpdAr$22319e165fd9620b7663c3b4806e782ce5653be89a2d01cef3f18c1a429cd7a7150ec534713bd7a02bc7350b82ec9097f50ab70e94e406150acb3a1a237cc092', 'Portal Administrator'
+WHERE NOT EXISTS (SELECT 1 FROM admins WHERE username = 'admin');
+
 -- 3. Insert Initial Seed Data (Three diverse sample opportunities)
 INSERT INTO research_opportunities 
 (title, description, research_area, faculty_name, department, required_skills, available_positions, deadline, status)

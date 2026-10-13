@@ -187,6 +187,72 @@ body {
   background-color: #fbbf24;
 }
 
+.auth-role-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--card-border);
+}
+
+.auth-role-badge.visitor {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+}
+
+.auth-role-badge.admin {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #a5b4fc;
+}
+
+.role-banner {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 0.95rem 1.35rem;
+  margin-bottom: 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.role-banner.visitor-banner {
+  border-left: 4px solid var(--accent-cyan);
+}
+
+.role-banner.admin-banner {
+  border-left: 4px solid var(--accent-emerald);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.banner-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  display: inline-block;
+  margin-bottom: 0.25rem;
+}
+
+.banner-content p {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.banner-content p strong {
+  color: #f1f5f9;
+}
+
 /* ==============================================================
    BUTTONS
    ============================================================== */

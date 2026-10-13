@@ -1,12 +1,16 @@
 /**
  * FAST-NUCES Research Opportunity Portal
  * Frontend Application Controller
- * Handles REST API communication, CRUD state, validations, and animations
+ * Handles REST API communication, Role-Based Access Control (RBAC),
+ * public visitor view, admin authentication, CRUD operations, and validations.
  */
 
 const API_BASE = '/api/opportunities';
+const AUTH_BASE = '/api/auth';
 
 // Application State
+let isAdmin = false;
+let currentAdminUser = null;
 let opportunities = [];
 let departmentsList = new Set();
 let currentFilter = {
@@ -16,7 +20,16 @@ let currentFilter = {
 };
 let pendingDeleteId = null;
 
-// DOM Elements
+// DOM Elements - Navigation & Auth
+const dbStatusBadge = document.getElementById('dbStatusBadge');
+const authBadge = document.getElementById('authBadge');
+const authBadgeText = document.getElementById('authBadgeText');
+const btnGoToLogin = document.getElementById('btnGoToLogin');
+const btnLogoutAdmin = document.getElementById('btnLogoutAdmin');
+const roleNoticeBanner = document.getElementById('roleNoticeBanner');
+const bannerMessage = document.getElementById('bannerMessage');
+
+// DOM Elements - Content & Filters
 const opportunitiesContainer = document.getElementById('opportunitiesContainer');
 const emptyState = document.getElementById('emptyState');
 const loadingIndicator = document.getElementById('loadingIndicator');
@@ -25,7 +38,6 @@ const filterStatus = document.getElementById('filterStatus');
 const filterDepartment = document.getElementById('filterDepartment');
 const btnRefresh = document.getElementById('btnRefresh');
 const btnResetFilters = document.getElementById('btnResetFilters');
-const dbStatusBadge = document.getElementById('dbStatusBadge');
 
 // Metrics Elements
 const statTotal = document.getElementById('statTotal');
@@ -33,7 +45,7 @@ const statOpen = document.getElementById('statOpen');
 const statPositions = document.getElementById('statPositions');
 const statDepts = document.getElementById('statDepts');
 
-// Form Modal Elements
+// Form Modal Elements (Admin Only)
 const opportunityModal = document.getElementById('opportunityModal');
 const modalTitle = document.getElementById('modalTitle');
 const opportunityForm = document.getElementById('opportunityForm');
@@ -53,12 +65,12 @@ const oppStatus = document.getElementById('oppStatus');
 const oppSkills = document.getElementById('oppSkills');
 const oppDescription = document.getElementById('oppDescription');
 
-// Detail Modal Elements
+// Detail Modal Elements (Public & Admin)
 const detailsModal = document.getElementById('detailsModal');
 const btnCloseDetails = document.getElementById('btnCloseDetails');
 const btnCloseDetailsBtn = document.getElementById('btnCloseDetailsBtn');
 
-// Delete Modal Elements
+// Delete Modal Elements (Admin Only)
 const deleteModal = document.getElementById('deleteModal');
 const deleteOppTitle = document.getElementById('deleteOppTitle');
 const btnCancelDelete = document.getElementById('btnCancelDelete');
@@ -67,11 +79,106 @@ const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 // ==============================================================
 // INITIALIZATION
 // ==============================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   checkApiHealth();
+  await checkAuthStatus();
   fetchOpportunities();
   setupEventListeners();
 });
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('admin_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+// ==============================================================
+// AUTHENTICATION & ROLE MANAGEMENT
+// ==============================================================
+
+async function checkAuthStatus() {
+  try {
+    const res = await fetch(`${AUTH_BASE}/status`, {
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    const data = await res.json();
+
+    if (res.ok && data.authenticated) {
+      isAdmin = true;
+      currentAdminUser = { username: data.username || 'admin' };
+      updateRoleUI(true);
+    } else {
+      isAdmin = false;
+      currentAdminUser = null;
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
+      updateRoleUI(false);
+    }
+  } catch (err) {
+    console.warn('Could not verify auth status:', err);
+    isAdmin = false;
+    updateRoleUI(false);
+  }
+}
+
+function updateRoleUI(adminLoggedIn) {
+  const adminOnlyElements = document.querySelectorAll('.admin-only');
+  const visitorOnlyElements = document.querySelectorAll('.visitor-only');
+
+  if (adminLoggedIn) {
+    // Show admin controls
+    adminOnlyElements.forEach(el => el.classList.remove('hidden'));
+    visitorOnlyElements.forEach(el => el.classList.add('hidden'));
+
+    authBadge.className = 'auth-role-badge admin';
+    authBadge.innerHTML = `<span class="role-icon">🛡️</span><span>Admin: ${escapeHtml(currentAdminUser?.username || 'admin')}</span>`;
+
+    if (roleNoticeBanner && bannerMessage) {
+      roleNoticeBanner.className = 'role-banner admin-banner';
+      bannerMessage.innerHTML = `Administrator Mode Active: You are authenticated as <strong>${escapeHtml(currentAdminUser?.username || 'admin')}</strong> with full management permissions (Create, Edit, Close/Reopen, and Delete).`;
+    }
+  } else {
+    // Visitor Mode (Strict Read-Only)
+    adminOnlyElements.forEach(el => el.classList.add('hidden'));
+    visitorOnlyElements.forEach(el => el.classList.remove('hidden'));
+
+    authBadge.className = 'auth-role-badge visitor';
+    authBadge.innerHTML = `<span class="role-icon">👤</span><span>Visitor (Read-Only)</span>`;
+
+    if (roleNoticeBanner && bannerMessage) {
+      roleNoticeBanner.className = 'role-banner visitor-banner';
+      bannerMessage.innerHTML = `You are currently browsing research opportunities as a <strong>Visitor (Read-Only)</strong>. No login or registration required. Administrative CRUD controls are restricted to the verified portal administrator.`;
+    }
+  }
+}
+
+async function handleAdminLogout() {
+  try {
+    const res = await fetch(`${AUTH_BASE}/logout`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    isAdmin = false;
+    currentAdminUser = null;
+    updateRoleUI(false);
+    renderFilteredOpportunities();
+    showToast('Administrator logged out. Switched to public visitor mode.', 'info');
+  } catch (err) {
+    showToast('Logout encountered an issue.', 'error');
+  }
+}
+
+// ==============================================================
+// EVENT LISTENERS
+// ==============================================================
 
 function setupEventListeners() {
   // Search & Filters
@@ -103,8 +210,22 @@ function setupEventListeners() {
     renderFilteredOpportunities();
   });
 
+  // Admin Logout
+  if (btnLogoutAdmin) {
+    btnLogoutAdmin.addEventListener('click', handleAdminLogout);
+  }
+
   // Modal Open/Close
-  btnOpenCreateModal.addEventListener('click', () => openCreateModal());
+  if (btnOpenCreateModal) {
+    btnOpenCreateModal.addEventListener('click', () => {
+      if (!isAdmin) {
+        showToast('Administrative privileges required to post opportunities.', 'error');
+        return;
+      }
+      openCreateModal();
+    });
+  }
+
   btnCloseModal.addEventListener('click', () => closeModal(opportunityModal));
   btnCancelModal.addEventListener('click', () => closeModal(opportunityModal));
   
@@ -136,7 +257,7 @@ function setupEventListeners() {
 }
 
 // ==============================================================
-// API CALLS
+// API CALLS (RESEARCH OPPORTUNITIES)
 // ==============================================================
 
 async function checkApiHealth() {
@@ -232,7 +353,7 @@ function createOpportunityCard(opp) {
 
   const isOpen = opp.status === 'Open';
   const statusClass = isOpen ? 'open' : 'closed';
-  const toggleBtnText = isOpen ? 'Close Opportunity' : 'Reopen Opportunity';
+  const toggleBtnText = isOpen ? 'Close Opening' : 'Reopen';
 
   // Skills chips
   const skillsArray = opp.required_skills
@@ -241,6 +362,44 @@ function createOpportunityCard(opp) {
   const skillsHtml = skillsArray.slice(0, 3)
     .map(s => `<span class="skill-pill">${escapeHtml(s)}</span>`)
     .join('') + (skillsArray.length > 3 ? `<span class="skill-pill">+${skillsArray.length - 3} more</span>` : '');
+
+  // Role-based action bar
+  let actionButtonsHtml = '';
+  if (isAdmin) {
+    // Authenticated Admin: Full CRUD and status toggle controls
+    actionButtonsHtml = `
+      <div class="card-actions">
+        <div class="action-group-left">
+          <button class="btn btn-secondary btn-sm" onclick="viewDetails(${opp.id})">Details</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditModal(${opp.id})">Edit</button>
+          <button class="btn-toggle-status" onclick="toggleOpportunityStatus(${opp.id}, '${opp.status}')">
+            ${toggleBtnText}
+          </button>
+        </div>
+        <button class="btn btn-danger btn-sm" title="Delete Opportunity" onclick="promptDelete(${opp.id}, '${escapeQuote(opp.title)}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+      </div>
+    `;
+  } else {
+    // Public Visitor Mode: Only "View Details" button, zero CRUD actions
+    actionButtonsHtml = `
+      <div class="card-actions">
+        <div class="action-group-left">
+          <button class="btn btn-secondary btn-sm" onclick="viewDetails(${opp.id})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            View Details
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
   card.innerHTML = `
     <div>
@@ -306,22 +465,7 @@ function createOpportunityCard(opp) {
       </div>
     </div>
 
-    <div class="card-actions">
-      <div class="action-group-left">
-        <button class="btn btn-secondary btn-sm" onclick="viewDetails(${opp.id})">Details</button>
-        <button class="btn btn-secondary btn-sm" onclick="openEditModal(${opp.id})">Edit</button>
-        <button class="btn-toggle-status" onclick="toggleOpportunityStatus(${opp.id}, '${opp.status}')">
-          ${toggleBtnText}
-        </button>
-      </div>
-
-      <button class="btn btn-danger btn-sm" onclick="promptDelete(${opp.id}, '${escapeQuote(opp.title)}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-      </button>
-    </div>
+    ${actionButtonsHtml}
   `;
 
   return card;
@@ -365,6 +509,10 @@ function showLoading(show) {
 // ==============================================================
 
 function openCreateModal() {
+  if (!isAdmin) {
+    showToast('Administrator privileges required.', 'error');
+    return;
+  }
   clearFormErrors();
   opportunityForm.reset();
   oppId.value = '';
@@ -380,6 +528,10 @@ function openCreateModal() {
 }
 
 async function openEditModal(id) {
+  if (!isAdmin) {
+    showToast('Administrator privileges required.', 'error');
+    return;
+  }
   clearFormErrors();
   const opp = opportunities.find(o => o.id === id) || await fetchSingleOpportunity(id);
   if (!opp) return;
@@ -430,11 +582,17 @@ async function viewDetails(id) {
 }
 
 // --------------------------------------------------------------
-// CREATE & UPDATE HANDLER
+// CREATE & UPDATE HANDLER (ADMIN ONLY)
 // --------------------------------------------------------------
 async function handleFormSubmit(e) {
   e.preventDefault();
   clearFormErrors();
+
+  if (!isAdmin) {
+    showToast('Authentication required. Only administrator can modify data.', 'error');
+    closeModal(opportunityModal);
+    return;
+  }
 
   const id = oppId.value;
   const isEditing = Boolean(id);
@@ -499,11 +657,21 @@ async function handleFormSubmit(e) {
 
     const response = await fetch(url, {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
+      credentials: 'include',
       body: JSON.stringify(payload)
     });
 
     const data = await response.json();
+
+    if (response.status === 401) {
+      showToast('Admin session expired. Please log in again.', 'error');
+      isAdmin = false;
+      updateRoleUI(false);
+      renderFilteredOpportunities();
+      closeModal(opportunityModal);
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(data.message || `Server error ${response.status}`);
@@ -522,18 +690,32 @@ async function handleFormSubmit(e) {
 }
 
 // --------------------------------------------------------------
-// QUICK STATUS TOGGLE
+// QUICK STATUS TOGGLE (ADMIN ONLY)
 // --------------------------------------------------------------
 async function toggleOpportunityStatus(id, currentStatus) {
+  if (!isAdmin) {
+    showToast('Administrator privileges required to change opportunity status.', 'error');
+    return;
+  }
+
   const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
   try {
     const response = await fetch(`${API_BASE}/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ status: newStatus })
     });
 
     const data = await response.json();
+    if (response.status === 401) {
+      showToast('Unauthorized. Session expired.', 'error');
+      isAdmin = false;
+      updateRoleUI(false);
+      renderFilteredOpportunities();
+      return;
+    }
+
     if (!response.ok) {
       throw new Error(data.message || 'Status update failed.');
     }
@@ -546,16 +728,20 @@ async function toggleOpportunityStatus(id, currentStatus) {
 }
 
 // --------------------------------------------------------------
-// DELETE ACTIONS
+// DELETE ACTIONS (ADMIN ONLY)
 // --------------------------------------------------------------
 function promptDelete(id, title) {
+  if (!isAdmin) {
+    showToast('Administrator privileges required to delete opportunities.', 'error');
+    return;
+  }
   pendingDeleteId = id;
   deleteOppTitle.textContent = `"${title}"`;
   openModal(deleteModal);
 }
 
 async function handleConfirmDelete() {
-  if (!pendingDeleteId) return;
+  if (!isAdmin || !pendingDeleteId) return;
 
   const btnConfirm = document.getElementById('btnConfirmDelete');
   btnConfirm.disabled = true;
@@ -563,10 +749,20 @@ async function handleConfirmDelete() {
 
   try {
     const response = await fetch(`${API_BASE}/${pendingDeleteId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include'
     });
 
     const data = await response.json();
+    if (response.status === 401) {
+      showToast('Unauthorized. Session expired.', 'error');
+      isAdmin = false;
+      updateRoleUI(false);
+      closeModal(deleteModal);
+      return;
+    }
+
     if (!response.ok) {
       throw new Error(data.message || 'Failed to delete opportunity.');
     }
