@@ -356,10 +356,10 @@ function buildCard(o) {
   const skillsHtml = skillsList.slice(0, 4)
     .map(s => `<span class="skill-pill">${escapeHtml(s)}</span>`).join('');
 
-  // Department badge & faculty badge
+  // Department badge & faculty badge (FAST Official phrase removed)
   const facultyBadgeHtml = o.faculty_id
     ? `<span class="dept-badge" style="background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(16,185,129,0.25);text-transform:none;">🎓 Faculty Post</span>`
-    : `<span class="dept-badge" style="background:rgba(99,102,241,0.12);color:#a5b4fc;border-color:rgba(99,102,241,0.25);text-transform:none;">FAST Official</span>`;
+    : '';
 
   card.innerHTML = `
     <div>
@@ -448,6 +448,24 @@ function buildCard(o) {
             </svg>
             Edit
           </button>
+          ${o.status === 'Open' ? `
+            <button class="btn btn-secondary btn-sm" onclick="toggleOpportunityStatus(${o.id}, 'Closed')" title="Click to close this opening" style="border-color:rgba(244,63,94,0.35);color:#fda4af;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+              </svg>
+              Close
+            </button>
+          ` : `
+            <button class="btn btn-secondary btn-sm" onclick="toggleOpportunityStatus(${o.id}, 'Open')" title="Click to reopen this opening" style="border-color:rgba(16,185,129,0.35);color:#6ee7b7;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              Reopen
+            </button>
+          `}
         ` : ''}
       </div>
       ${showEdit ? `
@@ -462,6 +480,29 @@ function buildCard(o) {
   `;
 
   return card;
+}
+
+// ─── Direct Status Toggle ─────────────────────────────────────────────────────
+async function toggleOpportunityStatus(id, newStatus) {
+  try {
+    const res = await fetch(`${API_BASE}/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ status: newStatus })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`Opportunity #${id} marked as ${newStatus}.`, 'success');
+      const opp = opportunities.find(o => o.id === id);
+      if (opp) opp.status = newStatus;
+      updateMetrics();
+      renderFilteredOpportunities();
+    } else {
+      showToast(data.message || `Failed to update status to ${newStatus}.`, 'error');
+    }
+  } catch (err) {
+    showToast('Network error while updating status.', 'error');
+  }
 }
 
 // ─── Modal Logic ──────────────────────────────────────────────────────────────

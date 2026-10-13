@@ -472,6 +472,15 @@
                 </svg>
                 Edit
               </button>
+              ${o.status === 'Open' ? `
+                <button class="btn btn-sm" onclick="toggleStatus(${o.id}, 'Closed')" style="background:rgba(244,63,94,.12);color:#fda4af;border:1px solid rgba(244,63,94,.25);" title="Close this opening">
+                  Close
+                </button>
+              ` : `
+                <button class="btn btn-sm" onclick="toggleStatus(${o.id}, 'Open')" style="background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.25);" title="Reopen this opening">
+                  Reopen
+                </button>
+              `}
               <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${o.id})">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"/>
@@ -533,6 +542,26 @@
       pendingDelId = id;
       document.getElementById('delTitle').textContent = opp.title;
       openModal('deleteModal');
+    }
+
+    async function toggleStatus(id, newStatus) {
+      try {
+        const res = await fetch(`/api/opportunities/${id}`, {
+          method: 'PUT',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Opportunity #${id} marked as ${newStatus}.`, 'success');
+          loadDashboard();
+        } else {
+          showToast(data.message || 'Status update failed.', 'error');
+        }
+      } catch (err) {
+        showToast('Network error while updating status.', 'error');
+      }
     }
 
     // ─── Form Submit (Create / Update) ────────────────────────────────────────
