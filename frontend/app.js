@@ -71,10 +71,10 @@ const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 
 // ─── Initialisation ───────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  setupEventListeners();
   checkApiHealth();
   await checkAuthStatus();
   fetchOpportunities();
-  setupEventListeners();
 });
 
 // ─── Auth Headers ─────────────────────────────────────────────────────────────
@@ -208,27 +208,52 @@ async function checkApiHealth() {
 
 // ─── Event Listeners ──────────────────────────────────────────────────────────
 function setupEventListeners() {
-  searchInput.addEventListener('input', e => {
-    currentFilter.search = e.target.value.toLowerCase().trim();
-    renderFilteredOpportunities();
-  });
-  filterStatus.addEventListener('change', e => {
-    currentFilter.status = e.target.value;
-    renderFilteredOpportunities();
-  });
-  filterDepartment.addEventListener('change', e => {
-    currentFilter.department = e.target.value;
-    renderFilteredOpportunities();
-  });
-  btnRefresh.addEventListener('click', () => {
-    fetchOpportunities();
-    showToast('Refreshing research opportunities...', 'info');
-  });
-  btnResetFilters.addEventListener('click', () => {
-    searchInput.value = ''; filterStatus.value = 'ALL'; filterDepartment.value = 'ALL';
-    currentFilter = { search: '', status: 'ALL', department: 'ALL' };
-    renderFilteredOpportunities();
-  });
+  if (searchInput) {
+    const handleSearch = () => {
+      currentFilter.search = searchInput.value.toLowerCase().trim();
+      renderFilteredOpportunities();
+    };
+    searchInput.addEventListener('input', handleSearch);
+    searchInput.addEventListener('keyup', handleSearch);
+    searchInput.addEventListener('change', handleSearch);
+    searchInput.addEventListener('search', handleSearch);
+
+    // Initial sync in case input was pre-filled or restored by browser
+    if (searchInput.value) {
+      currentFilter.search = searchInput.value.toLowerCase().trim();
+    }
+  }
+
+  if (filterStatus) {
+    filterStatus.addEventListener('change', e => {
+      currentFilter.status = e.target.value;
+      renderFilteredOpportunities();
+    });
+  }
+
+  if (filterDepartment) {
+    filterDepartment.addEventListener('change', e => {
+      currentFilter.department = e.target.value;
+      renderFilteredOpportunities();
+    });
+  }
+
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => {
+      fetchOpportunities();
+      showToast('Refreshing research opportunities...', 'info');
+    });
+  }
+
+  if (btnResetFilters) {
+    btnResetFilters.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      if (filterStatus) filterStatus.value = 'ALL';
+      if (filterDepartment) filterDepartment.value = 'ALL';
+      currentFilter = { search: '', status: 'ALL', department: 'ALL' };
+      renderFilteredOpportunities();
+    });
+  }
 
   if (btnLogoutAdmin)   btnLogoutAdmin.addEventListener('click', handleAdminLogout);
   if (btnLogoutFaculty) btnLogoutFaculty.addEventListener('click', handleFacultyLogout);
@@ -243,23 +268,24 @@ function setupEventListeners() {
     });
   }
 
-  btnCloseModal.addEventListener('click', () => closeModal(opportunityModal));
-  btnCancelModal.addEventListener('click', () => closeModal(opportunityModal));
-  btnCloseDetails.addEventListener('click', () => closeModal(detailsModal));
-  btnCloseDetailsBtn.addEventListener('click', () => closeModal(detailsModal));
-  btnCancelDelete.addEventListener('click', () => closeModal(deleteModal));
-  btnConfirmDelete.addEventListener('click', handleConfirmDelete);
+  if (btnCloseModal)      btnCloseModal.addEventListener('click', () => closeModal(opportunityModal));
+  if (btnCancelModal)     btnCancelModal.addEventListener('click', () => closeModal(opportunityModal));
+  if (btnCloseDetails)    btnCloseDetails.addEventListener('click', () => closeModal(detailsModal));
+  if (btnCloseDetailsBtn) btnCloseDetailsBtn.addEventListener('click', () => closeModal(detailsModal));
+  if (btnCancelDelete)    btnCancelDelete.addEventListener('click', () => closeModal(deleteModal));
+  if (btnConfirmDelete)   btnConfirmDelete.addEventListener('click', handleConfirmDelete);
 
-  opportunityForm.addEventListener('submit', handleFormSubmit);
+  if (opportunityForm)    opportunityForm.addEventListener('submit', handleFormSubmit);
 
   window.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      closeModal(opportunityModal);
-      closeModal(detailsModal);
-      closeModal(deleteModal);
+      if (opportunityModal) closeModal(opportunityModal);
+      if (detailsModal) closeModal(detailsModal);
+      if (deleteModal) closeModal(deleteModal);
     }
   });
-  [opportunityModal, detailsModal, deleteModal].forEach(m => {
+
+  [opportunityModal, detailsModal, deleteModal].filter(Boolean).forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) closeModal(m); });
   });
 }
@@ -313,16 +339,37 @@ function buildDepartmentFilter() {
 
 // ─── Render Cards ─────────────────────────────────────────────────────────────
 function renderFilteredOpportunities() {
+  const q = (currentFilter.search || '').trim().toLowerCase();
+  const searchWords = q.split(/\s+/).filter(Boolean);
+
   const filtered = opportunities.filter(o => {
-    const s = currentFilter.search;
-    const matchSearch = !s ||
-      (o.title || '').toLowerCase().includes(s) ||
-      (o.faculty_name || '').toLowerCase().includes(s) ||
-      (o.required_skills || '').toLowerCase().includes(s) ||
-      (o.department || '').toLowerCase().includes(s) ||
-      (o.research_area || '').toLowerCase().includes(s);
+    // 1. Text Search matching
+    let matchSearch = true;
+    if (searchWords.length > 0) {
+      const haystack = [
+        o.title,
+        o.description,
+        o.faculty_name,
+        o.faculty_account_name,
+        o.faculty_email,
+        o.department,
+        o.research_area,
+        o.required_skills,
+        o.status,
+        String(o.id),
+        '#' + o.id
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      // Every word typed must appear somewhere in the opportunity
+      matchSearch = searchWords.every(word => haystack.includes(word));
+    }
+
+    // 2. Status filter
     const matchStatus = currentFilter.status === 'ALL' || o.status === currentFilter.status;
-    const matchDept   = currentFilter.department === 'ALL' || o.department === currentFilter.department;
+
+    // 3. Department filter
+    const matchDept = currentFilter.department === 'ALL' || o.department === currentFilter.department;
+
     return matchSearch && matchStatus && matchDept;
   });
 

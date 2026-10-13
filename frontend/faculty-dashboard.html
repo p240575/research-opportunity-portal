@@ -216,13 +216,16 @@
     <!-- Posts table -->
     <div class="section-hdr">
       <h3>My Research Opportunities</h3>
-      <button id="btnRefresh" class="btn btn-ghost btn-sm">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        Refresh
-      </button>
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+        <input type="text" id="dashSearch" placeholder="Search my postings..." style="padding:.4rem .8rem;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--r-md);color:#fff;font-size:.82rem;font-family:inherit;width:220px;" autocomplete="off">
+        <button id="btnRefresh" class="btn btn-ghost btn-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
     </div>
 
     <div class="table-card">
@@ -437,18 +440,37 @@
       document.getElementById('mPositions').textContent = seats;
     }
 
+    let dashFilter = '';
+    const dashSearchEl = document.getElementById('dashSearch');
+    if (dashSearchEl) {
+      dashSearchEl.addEventListener('input', (e) => {
+        dashFilter = e.target.value.toLowerCase().trim();
+        renderTable();
+      });
+    }
+
     function renderTable() {
       const tbody = document.getElementById('oppTableBody');
-      if (!myOpps.length) {
+      const searchWords = dashFilter.split(/\s+/).filter(Boolean);
+      const filtered = myOpps.filter(o => {
+        if (!searchWords.length) return true;
+        const haystack = [
+          o.title, o.description, o.research_area, o.department,
+          o.required_skills, o.status, String(o.id), '#' + o.id
+        ].filter(Boolean).join(' ').toLowerCase();
+        return searchWords.every(w => haystack.includes(w));
+      });
+
+      if (!filtered.length) {
         tbody.innerHTML = `<tr><td colspan="7" class="empty-table">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-          <p>You haven't posted any research opportunities yet.</p>
-          <button onclick="openCreateModal()" class="btn btn-primary btn-sm" style="margin-top:.75rem;">Post Your First Opportunity</button>
+          <p>${myOpps.length ? 'No research opportunities match your search.' : "You haven't posted any research opportunities yet."}</p>
+          ${myOpps.length ? '' : '<button onclick="openCreateModal()" class="btn btn-primary btn-sm" style="margin-top:.75rem;">Post Your First Opportunity</button>'}
         </td></tr>`;
         return;
       }
 
-      tbody.innerHTML = myOpps.map(o => `
+      tbody.innerHTML = filtered.map(o => `
         <tr>
           <td style="color:var(--dim);font-size:.78rem;">#${o.id}</td>
           <td class="opp-title">
