@@ -337,7 +337,7 @@ function renderFilteredOpportunities() {
 
 function buildCard(o) {
   const card = document.createElement('article');
-  card.className = 'opportunity-card';
+  card.className = 'opp-card';
 
   // Determine if current user can edit/delete this card
   // Admin: all cards | Faculty: only their own (matched by faculty_id or faculty_email)
@@ -345,77 +345,122 @@ function buildCard(o) {
   if (currentRole === 'admin') {
     showEdit = true;
   } else if (currentRole === 'faculty' && currentUser) {
-    // Compare by faculty_id stored in opportunity
     showEdit = (o.faculty_id && o.faculty_id === currentUser.id) ||
                (o.faculty_email && o.faculty_email === currentUser.email);
   }
 
-  const skills = (o.required_skills || '').split(',').slice(0, 4)
-    .map(s => `<span class="skill-chip">${escapeHtml(s.trim())}</span>`).join('');
+  const statusClass = (o.status === 'Open') ? 'open' : 'closed';
+
+  // Skills chips
+  const skillsList = (o.required_skills || '').split(',').map(s => s.trim()).filter(Boolean);
+  const skillsHtml = skillsList.slice(0, 4)
+    .map(s => `<span class="skill-pill">${escapeHtml(s)}</span>`).join('');
+
+  // Department badge & faculty badge
+  const facultyBadgeHtml = o.faculty_id
+    ? `<span class="dept-badge" style="background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(16,185,129,0.25);text-transform:none;">🎓 Faculty Post</span>`
+    : `<span class="dept-badge" style="background:rgba(99,102,241,0.12);color:#a5b4fc;border-color:rgba(99,102,241,0.25);text-transform:none;">FAST Official</span>`;
 
   card.innerHTML = `
-    <div class="card-header-row">
-      <span class="status-badge ${o.status === 'Open' ? 'open' : 'closed'}">${o.status}</span>
-      <span class="card-id">#${o.id}</span>
+    <div>
+      <div class="card-top">
+        <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+          <span class="dept-badge">${escapeHtml(o.department || 'General')}</span>
+          <span style="font-size:0.72rem;color:var(--text-dim);font-weight:600;">#${o.id}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+          ${facultyBadgeHtml}
+          <span class="status-badge ${statusClass}">${escapeHtml(o.status)}</span>
+        </div>
+      </div>
+
+      <h3 class="card-title">${escapeHtml(o.title)}</h3>
+      
+      <div class="card-area">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        ${escapeHtml(o.research_area || 'General Research')}
+      </div>
+
+      <p class="card-desc">${escapeHtml(o.description || '')}</p>
+
+      <div class="card-meta-list">
+        <div class="meta-row">
+          <span class="meta-label-dim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            Supervisor
+          </span>
+          <span class="meta-val-highlight">${escapeHtml(o.faculty_name)}</span>
+        </div>
+
+        <div class="meta-row">
+          <span class="meta-label-dim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            Deadline
+          </span>
+          <span class="meta-val-highlight">${escapeHtml(o.deadline || 'N/A')}</span>
+        </div>
+
+        <div class="meta-row">
+          <span class="meta-label-dim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Positions
+          </span>
+          <span class="meta-val-highlight text-cyan">${o.available_positions} ${o.available_positions == 1 ? 'seat' : 'seats'}</span>
+        </div>
+      </div>
+
+      <div class="skills-preview">
+        ${skillsHtml}
+      </div>
     </div>
-    <h3 class="card-title">${escapeHtml(o.title)}</h3>
-    <div class="card-meta">
-      <span class="meta-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-        ${escapeHtml(o.faculty_name)}
-      </span>
-      <span class="meta-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-        </svg>
-        ${escapeHtml(o.department)}
-      </span>
-      <span class="meta-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        Deadline: ${o.deadline || 'N/A'}
-      </span>
-      <span class="meta-item">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-        ${o.available_positions} position${o.available_positions != 1 ? 's' : ''}
-      </span>
-    </div>
-    <div class="skills-row">${skills}</div>
-    <p class="card-desc">${escapeHtml((o.description || '').slice(0, 140))}${(o.description || '').length > 140 ? '…' : ''}</p>
-    <div class="card-footer-row">
-      <button class="btn btn-view" onclick="openDetailsModal(${o.id})">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
-        View Details
-      </button>
-      ${showEdit ? `
-        <button class="btn btn-edit-card" onclick="openEditModal(${o.id})">
+
+    <div class="card-actions">
+      <div class="action-group-left">
+        <button class="btn btn-secondary btn-sm" onclick="openDetailsModal(${o.id})">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
           </svg>
-          Edit
+          View Details
         </button>
-        <button class="btn btn-delete-card" onclick="openDeleteModal(${o.id})">
+        ${showEdit ? `
+          <button class="btn btn-secondary btn-sm" onclick="openEditModal(${o.id})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            Edit
+          </button>
+        ` : ''}
+      </div>
+      ${showEdit ? `
+        <button class="btn btn-danger btn-sm" title="Delete Opportunity" onclick="openDeleteModal(${o.id})">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
-          Delete
         </button>
       ` : ''}
     </div>
   `;
+
   return card;
 }
 
@@ -478,7 +523,7 @@ function openDetailsModal(id) {
 
   const chipsContainer = document.getElementById('detailSkillsChips');
   chipsContainer.innerHTML = (o.required_skills || '').split(',')
-    .map(s => `<span class="skill-chip">${escapeHtml(s.trim())}</span>`).join('');
+    .map(s => `<span class="skill-pill">${escapeHtml(s.trim())}</span>`).join('');
 
   openModal(detailsModal);
 }

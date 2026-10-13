@@ -631,7 +631,7 @@ body {
   gap: 0.35rem;
   margin-bottom: 1.25rem;
 }
-.skill-pill {
+.skill-pill, .skill-chip {
   font-size: 0.72rem;
   font-weight: 500;
   padding: 0.2rem 0.55rem;
@@ -914,7 +914,7 @@ textarea {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-.skills-chips .skill-pill {
+.skills-chips .skill-pill, .skills-chips .skill-chip {
   font-size: 0.82rem;
   padding: 0.35rem 0.8rem;
   background: rgba(99, 102, 241, 0.12);
