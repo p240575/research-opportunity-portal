@@ -356,11 +356,6 @@ function buildCard(o) {
   const skillsHtml = skillsList.slice(0, 4)
     .map(s => `<span class="skill-pill">${escapeHtml(s)}</span>`).join('');
 
-  // Department badge & faculty badge (FAST Official phrase removed)
-  const facultyBadgeHtml = o.faculty_id
-    ? `<span class="dept-badge" style="background:rgba(16,185,129,0.12);color:#6ee7b7;border-color:rgba(16,185,129,0.25);text-transform:none;">🎓 Faculty Post</span>`
-    : '';
-
   card.innerHTML = `
     <div>
       <div class="card-top">
@@ -369,7 +364,6 @@ function buildCard(o) {
           <span style="font-size:0.72rem;color:var(--text-dim);font-weight:600;">#${o.id}</span>
         </div>
         <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
-          ${facultyBadgeHtml}
           <span class="status-badge ${statusClass}">${escapeHtml(o.status)}</span>
         </div>
       </div>
