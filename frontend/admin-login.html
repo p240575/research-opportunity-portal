@@ -202,56 +202,6 @@
       line-height: 1.45;
     }
 
-    .demo-credentials-box {
-      background: rgba(99, 102, 241, 0.08);
-      border: 1px dashed rgba(99, 102, 241, 0.3);
-      border-radius: var(--radius-md);
-      padding: 0.75rem 1rem;
-      margin-bottom: 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      font-size: 0.8rem;
-    }
-
-    .demo-cred-info {
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-    }
-
-    .demo-cred-label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: #a5b4fc;
-    }
-
-    .demo-cred-values {
-      color: #e2e8f0;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-    }
-
-    .btn-fill-demo {
-      background: rgba(99, 102, 241, 0.2);
-      border: 1px solid rgba(99, 102, 241, 0.4);
-      color: #c7d2fe;
-      padding: 0.35rem 0.65rem;
-      border-radius: var(--radius-sm);
-      font-size: 0.75rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.2s ease;
-      font-family: inherit;
-    }
-    .btn-fill-demo:hover {
-      background: rgba(99, 102, 241, 0.35);
-      color: #fff;
-    }
 
     .form-group {
       margin-bottom: 1.15rem;
@@ -476,14 +426,6 @@
         <p class="login-subtitle">Sign in to manage faculty research openings and postings</p>
       </div>
 
-      <!-- Quick Demo Credentials Helper Card -->
-      <div class="demo-credentials-box">
-        <div class="demo-cred-info">
-          <span class="demo-cred-label">Seeded Credentials</span>
-          <span class="demo-cred-values">admin / AdminPassword123!</span>
-        </div>
-        <button type="button" id="btnFillDemo" class="btn-fill-demo">Fill Demo</button>
-      </div>
 
       <!-- Alert Banner (Hidden by Default) -->
       <div id="loginAlert" class="login-alert danger hidden">
@@ -576,14 +518,6 @@
     const passwordInput = document.getElementById('password');
     const btnTogglePassword = document.getElementById('btnTogglePassword');
     const eyeIcon = document.getElementById('eyeIcon');
-    const btnFillDemo = document.getElementById('btnFillDemo');
-
-    // Auto-fill demo credentials helper
-    btnFillDemo.addEventListener('click', () => {
-      usernameInput.value = 'admin';
-      passwordInput.value = 'AdminPassword123!';
-      alertBox.classList.add('hidden');
-    });
 
     // Password visibility toggle
     btnTogglePassword.addEventListener('click', () => {

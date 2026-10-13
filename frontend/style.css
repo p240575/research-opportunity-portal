@@ -1120,55 +1120,7 @@ textarea {
   line-height: 1.45;
 }
 
-.demo-credentials-box {
-  background: rgba(99, 102, 241, 0.08);
-  border: 1px dashed rgba(99, 102, 241, 0.3);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-}
 
-.demo-cred-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.demo-cred-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: #a5b4fc;
-}
-
-.demo-cred-values {
-  color: #e2e8f0;
-  font-family: var(--font-mono);
-}
-
-.btn-fill-demo {
-  background: rgba(99, 102, 241, 0.2);
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  color: #c7d2fe;
-  padding: 0.35rem 0.65rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
-}
-
-.btn-fill-demo:hover {
-  background: rgba(99, 102, 241, 0.35);
-  color: #fff;
-}
 
 .input-with-icon-wrapper {
   position: relative;
