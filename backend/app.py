@@ -108,6 +108,14 @@ def serve_admin_login():
     """Serves the dedicated administrative login page."""
     return send_from_directory(app.static_folder, "admin-login.html")
 
+@app.route("/admin/<path:filename>")
+def serve_admin_assets(filename):
+    """Fallback to serve static assets (CSS, JS) if requested with /admin/ prefix."""
+    file_path = os.path.join(app.static_folder, filename)
+    if os.path.exists(file_path):
+        return send_from_directory(app.static_folder, filename)
+    return send_from_directory(app.static_folder, "admin-login.html")
+
 # -------------------------------------------------------------
 # HEALTHCHECK & SYSTEM STATUS
 # -------------------------------------------------------------
