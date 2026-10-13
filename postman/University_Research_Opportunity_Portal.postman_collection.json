@@ -1,0 +1,183 @@
+{
+  "info": {
+    "_postman_id": "a98c56e0-2b1d-4f01-9a7c-c8525b4fa61e",
+    "name": "University Research Opportunity Portal API",
+    "description": "Postman test collection for CN Assignment #1 - FAST-NUCES Peshawar.\nCovers all 8 required assignment demonstration scenarios including CRUD, Status Codes (200, 201, 400, 404), and validation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Create Opportunity #1 (Networks & AI)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"AI-Driven Traffic Optimization for Software Defined Networks\",\n  \"description\": \"Investigating deep reinforcement learning algorithms to dynamically route packet flows and minimize latency in enterprise SDN topologies.\",\n  \"research_area\": \"Computer Networks & AI\",\n  \"faculty_name\": \"Dr. Tariq Khan\",\n  \"department\": \"Computer Science\",\n  \"required_skills\": \"Python, Mininet, PyTorch, SDN / OpenFlow\",\n  \"available_positions\": 2,\n  \"deadline\": \"2026-11-30\",\n  \"status\": \"Open\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/opportunities",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities"]
+        },
+        "description": "Creates first research opportunity. Expected response: 201 Created."
+      }
+    },
+    {
+      "name": "2. Create Opportunity #2 (Cybersecurity IoT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Zero-Trust Security Architectures for Edge IoT Devices\",\n  \"description\": \"Designing lightweight mutual authentication and continuous verification protocols for resource-constrained IoT gateways in smart campus deployments.\",\n  \"research_area\": \"Cybersecurity\",\n  \"faculty_name\": \"Dr. Ayesha Siddiqa\",\n  \"department\": \"Computer Science\",\n  \"required_skills\": \"C/C++, Cryptography basics, Network Security, Wireshark\",\n  \"available_positions\": 3,\n  \"deadline\": \"2026-12-15\",\n  \"status\": \"Open\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/opportunities",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities"]
+        },
+        "description": "Creates second research opportunity. Expected response: 201 Created."
+      }
+    },
+    {
+      "name": "3. Create Opportunity #3 (Data Science & Healthcare)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Federated Learning for Privacy-Preserving Medical Telemetry\",\n  \"description\": \"Developing decentralized model training frameworks across hospital edge nodes while ensuring zero patient biometric data leakage.\",\n  \"research_area\": \"Machine Learning\",\n  \"faculty_name\": \"Dr. Usman Farooq\",\n  \"department\": \"Data Science\",\n  \"required_skills\": \"Python, TensorFlow Federated, Differential Privacy\",\n  \"available_positions\": 1,\n  \"deadline\": \"2026-11-20\",\n  \"status\": \"Open\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/opportunities",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities"]
+        },
+        "description": "Creates third research opportunity. Expected response: 201 Created."
+      }
+    },
+    {
+      "name": "4. Retrieve All Research Opportunities",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/opportunities",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities"]
+        },
+        "description": "Retrieves all research opportunities in database. Expected response: 200 OK."
+      }
+    },
+    {
+      "name": "5. Retrieve One Opportunity by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/opportunities/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities", "1"]
+        },
+        "description": "Retrieves details of opportunity with ID 1. Expected response: 200 OK."
+      }
+    },
+    {
+      "name": "6. Update Existing Opportunity",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"AI-Driven SDN Optimization with P4 Programmable Data Planes\",\n  \"available_positions\": 4,\n  \"deadline\": \"2026-12-30\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/opportunities/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities", "1"]
+        },
+        "description": "Updates title, seats, and deadline for opportunity ID 1. Expected response: 200 OK."
+      }
+    },
+    {
+      "name": "7. Change Status from Open to Closed",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"Closed\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/opportunities/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities", "1"]
+        },
+        "description": "Toggles status of opportunity 1 to Closed. Expected response: 200 OK."
+      }
+    },
+    {
+      "name": "8. Delete an Opportunity",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/opportunities/3",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities", "3"]
+        },
+        "description": "Deletes opportunity ID 3. Expected response: 200 OK."
+      }
+    },
+    {
+      "name": "9. Verify Deleted Opportunity (404 Not Found)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/opportunities/3",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities", "3"]
+        },
+        "description": "Requests deleted opportunity ID 3 to verify 404 response. Expected response: 404 Not Found."
+      }
+    },
+    {
+      "name": "10. Input Validation Failure (400 Bad Request)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Incomplete Opportunity\",\n  \"available_positions\": -5\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/opportunities",
+          "host": ["{{base_url}}"],
+          "path": ["api", "opportunities"]
+        },
+        "description": "Sends request with missing required fields and negative positions. Expected response: 400 Bad Request."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:5000",
+      "type": "string"
+    }
+  ]
+}
