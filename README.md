@@ -1,106 +1,121 @@
 # University Research Opportunity Portal
-
-[![Course](https://img.shields.io/badge/Course-Computer%20Networks-blue)](https://www.nu.edu.pk/)
-[![Semester](https://img.shields.io/badge/Semester-Fall%202026-green)](https://www.nu.edu.pk/)
-[![Database](https://img.shields.io/badge/Database-MySQL%208.4-orange)](https://www.mysql.com/)
-[![Backend](https://img.shields.io/badge/Backend-Python%20%2F%20Flask-black)](https://flask.palletsprojects.com/)
-[![Security](https://img.shields.io/badge/Auth-RBAC%20%26%20Session%20Tokens-purple)](https://flask.palletsprojects.com/)
-
-> **Assignment No. 1 — University Research Opportunity Portal**  
-> **Course:** Computer Networks (BS CS 5B)  
-> **Institution:** National University of Computer & Emerging Sciences (FAST-NUCES), Peshawar Campus  
+**Assignment No. 1 — Computer Networks (Fall 2026)**  
+**FAST-NUCES, Peshawar Campus**  
+*BS Computer Science (BS CS 5B)*
 
 ---
 
-## 📌 GitHub Repository
-* **Repository Link:** `https://github.com/username/research-opportunity-portal` *(Replace with your actual GitHub repository URL before submission)*
+## 📖 Overview
+The **FAST-NUCES Research Opportunity Portal** is a production-grade web application built to facilitate academic research collaboration between professors and undergraduate students. It features a modern dark-mode interface with glassmorphism aesthetics, dynamic filtering, real-time database health monitoring, and a **Three-Role Access Control (RBAC)** architecture:
 
-> **Security Note:** In strict compliance with assignment guidelines, no database passwords, API keys, `.env` files, personal access tokens, or private credentials are committed to this repository. All sensitive parameters are configured via `.env` which is ignored by `.gitignore`.
-
----
-
-## 📖 Scenario & Access Control Architecture
-
-University research opportunities are traditionally fragmented across disparate noticeboards, emails, and WhatsApp groups, causing students to miss deadlines and professors to struggle with opening management. 
-
-This full-stack application provides a centralized web portal with strict **Role-Based Access Control (RBAC)**:
-
-### 1. Public Visitor Access (Read-Only)
-* **Zero Barrier to Entry:** Visitors can open the portal, search, filter, and view complete research details **without registering, logging in, or providing credentials**.
-* **Protected Views:** The Create, Edit, and Delete controls are completely hidden from visitors on the user interface.
-* **Backend Enforced:** Any direct attempt to call Create/Update/Delete endpoints from a browser console, Postman, or curl without valid authentication is rejected with **`HTTP 401 Unauthorized`**.
-
-### 2. Administrator Access (Full CRUD)
-* **Dedicated Admin Login:** Administrators authenticate via a separate login page at `/admin/login`.
-* **Administrative Controls:** Once authenticated, the admin can create new research openings, edit existing records, toggle status between Open and Closed, and permanently delete opportunities.
-* **Session Invalidation:** Logging out terminates the session and revokes the active token, returning the user to read-only visitor mode.
+1. **Visitors (Public Read-Only)**: Students and external guests can browse, search, and view all published research opportunities without authenticating or providing credentials. Visitors cannot create, edit, or delete any listings.
+2. **Faculty Members (Authenticated Self-Service)**: Faculty members register with their university email, log in securely, and manage their own research opportunities through a dedicated personal dashboard. Strict backend ownership authorization ensures faculty can only edit and delete posts they created.
+3. **Portal Administrator (Global Management)**: System administrator with full authority to oversee, modify, and delete any research opportunity portal-wide, and post official university listings.
 
 ---
 
-## 🛠️ Technology Stack
-* **Backend:** Python 3.14 / Flask, Flask-CORS, PyMySQL, Cryptography, python-dotenv, Werkzeug Security (Scrypt password hashing)
-* **Database:** MySQL 8.4
-* **Frontend:** Semantic HTML5, Vanilla CSS3 (Custom Glassmorphism Design System), Modern JavaScript (Fetch API, RBAC controller)
-* **Testing:** Postman / Bruno (Collection v2.1 with public, security, and administrative test suites)
-* **Version Control:** Git
+## 🏛️ System Architecture
+
+```mermaid
+graph TD
+    Client[Browser / Frontend Client]
+    subgraph Frontend Pages
+        PublicUI[Public Portal: /]
+        FacReg[Faculty Register: /faculty/register]
+        FacLog[Faculty Login: /faculty/login]
+        FacDash[Faculty Dashboard: /faculty/dashboard]
+        AdmLog[Admin Login: /admin/login]
+    end
+    Client --> PublicUI
+    Client --> FacReg
+    Client --> FacLog
+    Client --> FacDash
+    Client --> AdmLog
+
+    subgraph Backend REST API [Flask + Werkzeug]
+        AuthCtrl[Auth Controller & RBAC Guards]
+        OppCtrl[Opportunities CRUD & Ownership Checks]
+    end
+    PublicUI --> OppCtrl
+    FacReg --> AuthCtrl
+    FacLog --> AuthCtrl
+    FacDash --> OppCtrl
+    AdmLog --> AuthCtrl
+
+    subgraph Database [MySQL 8.4 Server]
+        T_Faculty[(faculty)]
+        T_Admins[(admins)]
+        T_Opps[(research_opportunities)]
+    end
+    AuthCtrl --> T_Faculty
+    AuthCtrl --> T_Admins
+    OppCtrl --> T_Opps
+```
 
 ---
 
-## 🗄️ Database Schema & Data Models
+## 🗄️ Database Architecture & Schema
 
 ### 1. `research_opportunities` Table
-Each opportunity contains the 10 mandatory fields:
-1. `id` (`INT AUTO_INCREMENT PRIMARY KEY`)
-2. `title` (`VARCHAR(255)`): Research project title
-3. `description` (`TEXT`): Overview, student responsibilities, and objectives
-4. `research_area` (`VARCHAR(150)`): Discipline (e.g. Computer Networks, Cybersecurity, AI)
-5. `faculty_name` (`VARCHAR(150)`): Supervising professor
-6. `department` (`VARCHAR(100)`): Academic department
-7. `required_skills` (`TEXT`): Technical prerequisites
-8. `available_positions` (`INT`): Student seat count
-9. `deadline` (`DATE`): Application cutoff date (`YYYY-MM-DD`)
-10. `status` (`ENUM('Open', 'Closed')`): Current listing status
+Contains the research listings linked to faculty creators:
+* `id` (`INT AUTO_INCREMENT PRIMARY KEY`)
+* `title` (`VARCHAR(255) NOT NULL`): Research project title
+* `description` (`TEXT NOT NULL`): Project summary and objectives
+* `research_area` (`VARCHAR(150) NOT NULL`): Research field (e.g., Computer Networks, AI, Photonics)
+* `faculty_name` (`VARCHAR(150) NOT NULL`): Lead investigator / professor name
+* `department` (`VARCHAR(100) NOT NULL`): Academic department
+* `required_skills` (`TEXT NOT NULL`): Technical prerequisites and tools
+* `available_positions` (`INT NOT NULL`): Available seats (must be positive integer)
+* `deadline` (`DATE NOT NULL`): Application cutoff date (`YYYY-MM-DD`)
+* `status` (`ENUM('Open', 'Closed') NOT NULL`): Current status
+* `faculty_id` (`INT DEFAULT NULL`, `FOREIGN KEY` references `faculty(id)`): Owner faculty account (`NULL` indicates admin-created post)
 
-### 2. `admins` Table (Authentication)
+### 2. `faculty` Table
+Stores registered faculty member accounts:
+* `id` (`INT AUTO_INCREMENT PRIMARY KEY`)
+* `full_name` (`VARCHAR(150) NOT NULL`): Faculty display name
+* `email` (`VARCHAR(200) UNIQUE NOT NULL`): University email address
+* `department` (`VARCHAR(100) NOT NULL`): Academic department
+* `password_hash` (`VARCHAR(255) NOT NULL`): Cryptographically hashed password using Werkzeug scrypt
+* `is_active` (`TINYINT(1) DEFAULT 1`)
+* `created_at` (`TIMESTAMP DEFAULT CURRENT_TIMESTAMP`)
+
+### 3. `admins` Table
+Stores administrative credentials:
 * `id` (`INT AUTO_INCREMENT PRIMARY KEY`)
 * `username` (`VARCHAR(100) UNIQUE NOT NULL`)
-* `password_hash` (`VARCHAR(255) NOT NULL`): Cryptographically hashed using PBKDF2/Scrypt
+* `password_hash` (`VARCHAR(255) NOT NULL`)
 * `full_name` (`VARCHAR(150)`): Administrator display name
 * `created_at` (`TIMESTAMP DEFAULT CURRENT_TIMESTAMP`)
 
-**Default Seeded Administrator Credentials:**
+**Default Seeded Admin Credentials:**
 * **Username:** `admin`
-* **Password:** `AdminPassword123!` *(Configurable via environment variables)*
+* **Password:** `AdminPassword123!`
 
 ---
 
 ## 🚀 Getting Started & Setup Instructions
 
 ### 1. Prerequisites
-Ensure the following tools are installed on your system:
-* Python 3.10+ (`python3 --version`)
-* MySQL Server (`sudo systemctl status mysql`)
-* Git (`git --version`)
-
-### 2. Clone Repository & Setup Virtual Environment
+Ensure Python 3.10+ and MySQL are installed:
 ```bash
-git clone https://github.com/username/research-opportunity-portal.git
-cd research-opportunity-portal
+python3 --version
+sudo systemctl status mysql
+```
 
-# Create and activate Python virtual environment
+### 2. Virtual Environment & Dependencies
+```bash
 python3 -m venv venv
 source venv/bin/activate
-
-# Install required dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
-Copy `.env.example` to create your local `.env` configuration:
+### 3. Environment Configuration
+Copy `.env.example` to `.env` if not already present:
 ```bash
 cp .env.example .env
 ```
-Ensure `.env` matches your MySQL database configuration:
+Ensure credentials match your MySQL installation:
 ```env
 DB_HOST=localhost
 DB_PORT=3306
@@ -113,26 +128,18 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=AdminPassword123!
 ```
 
-### 4. Initialize Database
-Initialize the database and tables using MySQL CLI:
-```bash
-sudo mysql < database/schema.sql
-```
-
-*(Or use the automated Python initializer:)*
-```bash
-python3 scripts/init_db.py
-```
-
-### 5. Run the Application
-Start the Flask server:
+### 4. Run the Portal
+Start the backend server:
 ```bash
 source venv/bin/activate
 python3 backend/app.py
 ```
-Open your browser and navigate to:
-* **Public Visitor Portal (Read-Only):** `http://127.0.0.1:5000/`
-* **Dedicated Admin Login:** `http://127.0.0.1:5000/admin/login`
+Access the application URLs:
+* **Public Visitor Portal**: `http://127.0.0.1:5000/`
+* **Faculty Registration**: `http://127.0.0.1:5000/faculty/register`
+* **Faculty Login**: `http://127.0.0.1:5000/faculty/login`
+* **Faculty Dashboard**: `http://127.0.0.1:5000/faculty/dashboard`
+* **Admin Login**: `http://127.0.0.1:5000/admin/login`
 
 ---
 
@@ -140,66 +147,57 @@ Open your browser and navigate to:
 
 | Method | Endpoint | Access Level | Description | Status Codes |
 | :--- | :--- | :--- | :--- | :--- |
-| **`GET`** | `/api/opportunities` | **Public** | Retrieve all opportunities | `200 OK`, `500 Error` |
-| **`GET`** | `/api/opportunities/:id` | **Public** | Retrieve single opportunity details | `200 OK`, `404 Not Found` |
-| **`GET`** | `/api/health` | **Public** | Healthcheck & MySQL status | `200 OK`, `500 Error` |
-| **`GET`** | `/api/auth/status` | **Public** | Check current session role | `200 OK` |
-| **`POST`** | `/api/auth/login` | **Public** | Authenticate administrator | `200 OK`, `400 Bad Request`, `401 Unauthorized` |
-| **`POST`** | `/api/auth/logout` | **Admin** | Invalidate administrator session | `200 OK` |
-| **`POST`** | `/api/opportunities` | **Admin Only** | Create a new research opening | `201 Created`, `400 Bad Request`, `401 Unauthorized` |
-| **`PUT`** | `/api/opportunities/:id` | **Admin Only** | Update opportunity or toggle status | `200 OK`, `400 Bad Request`, `401 Unauthorized`, `404 Not Found` |
-| **`DELETE`**| `/api/opportunities/:id` | **Admin Only** | Delete an opportunity | `200 OK`, `401 Unauthorized`, `404 Not Found` |
+| **`GET`** | `/api/opportunities` | **Public** | Browse all research opportunities | `200 OK`, `500 Error` |
+| **`GET`** | `/api/opportunities/:id` | **Public** | View specific opportunity details | `200 OK`, `404 Not Found` |
+| **`GET`** | `/api/health` | **Public** | Database health and connectivity | `200 OK`, `500 Error` |
+| **`GET`** | `/api/auth/status` | **Public** | Check current session role & identity | `200 OK` |
+| **`POST`** | `/api/faculty/register` | **Public** | Register a new faculty account | `201 Created`, `409 Conflict`, `422 Unprocessable` |
+| **`POST`** | `/api/faculty/login` | **Public** | Authenticate faculty member | `200 OK`, `400 Bad Request`, `401 Unauthorized` |
+| **`POST`** | `/api/faculty/logout` | **Faculty** | Faculty logout and session invalidation | `200 OK` |
+| **`GET`** | `/api/faculty/opportunities`| **Faculty/Admin** | Retrieve only opportunities owned by user | `200 OK`, `401 Unauthorized` |
+| **`POST`** | `/api/auth/login` | **Public** | Authenticate portal administrator | `200 OK`, `401 Unauthorized` |
+| **`POST`** | `/api/auth/logout` | **Admin** | Admin logout and session invalidation | `200 OK` |
+| **`POST`** | `/api/opportunities` | **Faculty / Admin**| Create research opportunity (auto-tagged with faculty ID) | `201 Created`, `400 Bad Request`, `401 Unauthorized` |
+| **`PUT`** | `/api/opportunities/:id` | **Owner / Admin** | Update opportunity (strict ownership check) | `200 OK`, `403 Forbidden`, `404 Not Found` |
+| **`DELETE`**| `/api/opportunities/:id` | **Owner / Admin** | Delete opportunity (strict ownership check) | `200 OK`, `403 Forbidden`, `404 Not Found` |
 
 ---
 
-## 🧪 Postman & Bruno Testing
+## 🔒 Security & Ownership Isolation Highlights
 
-The exported collection is located at:
-📁 `postman/University_Research_Opportunity_Portal.postman_collection.json`
-
-### Test Suite Structure:
-1. **Public Access (Visitor):**
-   - Retrieve all opportunities (`200 OK`).
-   - Retrieve single opportunity (`200 OK`).
-   - Auth status verification (`authenticated: false, role: "visitor"`).
-2. **Security & Authorization Enforcement:**
-   - Unauthenticated `POST` rejected with `401 Unauthorized`.
-   - Unauthenticated `PUT` rejected with `401 Unauthorized`.
-   - Unauthenticated `DELETE` rejected with `401 Unauthorized`.
-   - Invalid admin credentials rejected with `401 Unauthorized`.
-3. **Admin Authentication:**
-   - Valid login (`200 OK`) and automatic capture of `admin_token`.
-   - Verify authenticated status (`authenticated: true, role: "administrator"`).
-4. **Protected Administrative Operations:**
-   - Create opportunities with Bearer token (`201 Created`).
-   - Update opportunity with Bearer token (`200 OK`).
-   - Toggle status Open $\rightarrow$ Closed (`200 OK`).
-   - Delete opportunity (`200 OK`).
-   - Field validation failure check (`400 Bad Request`).
-   - Missing resource check (`404 Not Found`).
-5. **Logout & Session Revocation:**
-   - Admin logout (`200 OK`).
-   - Attempting operation with revoked token rejected with `401 Unauthorized`.
+* **Backend Ownership Enforcement:** Every opportunity posted by a faculty member records their `faculty_id`. When any faculty member attempts to `PUT` or `DELETE` an opportunity, the backend queries the existing record and verifies `opportunity.faculty_id == authenticated_user.id`. If mismatched, the request is rejected immediately with **`403 Forbidden`**. Tampering with the opportunity ID in API requests is strictly blocked.
+* **Password Security:** All passwords (faculty and admin) are hashed using cryptographically secure scrypt hashing before storage. Passwords are never stored in plaintext.
+* **Duplicate Account Protection:** Faculty registration enforces unique university emails; attempting to register an existing email returns **`409 Conflict`**.
+* **Visitor Read-Only Guarantee:** Unauthenticated requests to mutation endpoints (`POST`, `PUT`, `DELETE`) are rejected with **`401 Unauthorized`**.
 
 ---
 
-## 🎥 1-Minute Demonstration Video Guide (Max 60s)
-1. **0:00 - 0:15:** Open public portal (`http://127.0.0.1:5000`). Show that visitors see all research openings and "View Details" without needing any login or registration. Point out that Create, Edit, and Delete buttons are absent.
-2. **0:15 - 0:25:** Click "Admin Login" in the header to open `/admin/login`. Log in as `admin`. Show the UI updating to Administrator Mode with "+ Post Opportunity", Edit, Delete, and Status Toggle buttons visible.
-3. **0:25 - 0:40:** Create an opportunity, toggle status from Open to Closed, and delete a listing.
-4. **0:40 - 0:50:** Click "Logout". Demonstrate that the UI immediately reverts to visitor read-only mode.
-5. **0:50 - 0:60:** Switch to Postman: Show public `GET` succeeding with `200 OK`, and unauthorized `POST` rejected with `401 Unauthorized`.
+## 🧪 Automated Testing
 
----
-
-## 📦 Submission ZIP Packaging
-Package the assignment repository:
+Execute the comprehensive automated test suite verifying all 18 RBAC scenarios:
 ```bash
-zip -r P24_0000_NAME_CLASS.zip . -x "venv/*" ".git/*" ".env" "__pycache__/*"
+python3 backend/test_rbac.py
 ```
-Ensure the ZIP contains:
-* Complete backend and frontend source code
+
+Test results cover:
+1. Visitor read-only access and mutation block (`401 Unauthorized`).
+2. Faculty registration validation, duplicate email detection (`409 Conflict`), and password mismatch protection.
+3. Faculty authentication, session issuance, and `/api/auth/status`.
+4. Faculty post creation and personal dashboard filtering (`GET /api/faculty/opportunities`).
+5. **Backend security**: Cross-faculty edit and delete attempts rejected with `403 Forbidden`.
+6. Owner faculty self-service edit and delete (`200 OK`).
+7. Admin overarching authority to manage any faculty post and create portal-wide posts.
+8. Static frontend route availability (`/`, `/faculty/register`, `/faculty/login`, `/faculty/dashboard`, `/admin/login`).
+
+---
+
+## 📦 Submission Packaging
+```bash
+zip -r P24_0000_NAME_CLASS.zip . -x "venv/*" ".git/*" ".env" "__pycache__/*" "backend/__pycache__/*"
+```
+Ensure the ZIP includes:
+* Backend and frontend source code
 * `database/schema.sql`
 * `postman/University_Research_Opportunity_Portal.postman_collection.json`
-* `README.md`
-* Link to 1-minute demonstration video
+* `README.md` and `PROJECT_STATUS.md`
+* Link to demonstration video

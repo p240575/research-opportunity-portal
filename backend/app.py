@@ -1,497 +1,551 @@
 import os
 import secrets
+import re
 from functools import wraps
 from datetime import datetime, date
 from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 from db import (
-    get_db_connection, 
-    test_connection, 
-    init_admin_tables, 
-    verify_admin_credentials
+    get_db_connection,
+    test_connection,
+    init_admin_tables,
+    verify_admin_credentials,
+    register_faculty,
+    verify_faculty_credentials,
+    get_faculty_by_email
 )
 
-# Initialize Flask app
+# ---------------------------------------------------------------------------
+# App Bootstrap
+# ---------------------------------------------------------------------------
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
 app = Flask(__name__, static_folder=frontend_dir, static_url_path='')
 
-# Secret key for session management
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-# Allow CORS with credentials support
 CORS(app, supports_credentials=True)
 
-# Active administrative tokens storage for API clients (Postman, Bruno, mobile/curl)
-# Format: { token: { "username": str, "created_at": datetime } }
-active_tokens = {}
+# In-memory token store for API clients (Postman / curl)
+# Format: { token: { "role": "admin"|"faculty", "username": str, "id": int, ... } }
+active_tokens: dict = {}
 
-# Ensure tables and default admin account exist on startup
+# Run table migrations on startup
 init_admin_tables()
 
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
 def serialize_row(row):
-    """Formats database date objects into ISO strings for JSON serialization."""
+    """Converts date/datetime fields to ISO strings for JSON output."""
     if not row:
         return row
     res = dict(row)
-    if isinstance(res.get("deadline"), (date, datetime)):
-        res["deadline"] = res["deadline"].strftime("%Y-%m-%d")
-    if isinstance(res.get("created_at"), (date, datetime)):
-        res["created_at"] = res["created_at"].strftime("%Y-%m-%d %H:%M:%S")
-    if isinstance(res.get("updated_at"), (date, datetime)):
-        res["updated_at"] = res["updated_at"].strftime("%Y-%m-%d %H:%M:%S")
+    for field in ("deadline", "created_at", "updated_at"):
+        if isinstance(res.get(field), (date, datetime)):
+            fmt = "%Y-%m-%d" if field == "deadline" else "%Y-%m-%d %H:%M:%S"
+            res[field] = res[field].strftime(fmt)
     return res
 
-# -------------------------------------------------------------
-# AUTHENTICATION & AUTHORIZATION MIDDLEWARE
-# -------------------------------------------------------------
-def get_current_admin():
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+def valid_email(email: str) -> bool:
+    return bool(EMAIL_RE.match(email))
+
+# ---------------------------------------------------------------------------
+# Authentication helpers — support cookie session OR Bearer token
+# ---------------------------------------------------------------------------
+def _token_from_request() -> str | None:
+    auth = request.headers.get("Authorization", "").strip()
+    if auth.startswith("Bearer "):
+        return auth.split(" ", 1)[1].strip()
+    return request.headers.get("X-Admin-Token", "").strip() or None
+
+def get_current_user():
     """
-    Checks whether the current request is from an authenticated admin.
-    Supports:
-    1. Flask Session Cookie (session['is_admin'])
-    2. Authorization: Bearer <token>
-    3. X-Admin-Token: <token>
+    Returns a dict describing the authenticated user, or None.
+    Dict keys: role ("admin" | "faculty"), id, username/email, full_name
     """
-    # 1. Check Flask session cookie
-    if session.get("is_admin"):
+    # 1. Check Flask session
+    role = session.get("role")
+    if role == "admin" and session.get("is_admin"):
         return {
-            "username": session.get("admin_username", "admin"),
-            "source": "session"
+            "role":      "admin",
+            "id":        session.get("admin_id"),
+            "username":  session.get("admin_username", "admin"),
+            "full_name": session.get("admin_full_name", "Portal Administrator"),
+            "source":    "session"
+        }
+    if role == "faculty" and session.get("faculty_id"):
+        return {
+            "role":       "faculty",
+            "id":         session.get("faculty_id"),
+            "email":      session.get("faculty_email"),
+            "full_name":  session.get("faculty_full_name"),
+            "department": session.get("faculty_department"),
+            "source":     "session"
         }
 
-    # 2. Check Authorization Bearer header
-    auth_header = request.headers.get("Authorization", "").strip()
-    token = None
-    if auth_header.startswith("Bearer "):
-        token = auth_header.split(" ", 1)[1].strip()
-    elif request.headers.get("X-Admin-Token"):
-        token = request.headers.get("X-Admin-Token").strip()
-
+    # 2. Check Bearer / X-Admin-Token header
+    token = _token_from_request()
     if token and token in active_tokens:
-        return {
-            "username": active_tokens[token]["username"],
-            "source": "token",
-            "token": token
-        }
+        return active_tokens[token]
 
     return None
 
 def admin_required(f):
-    """
-    Decorator to protect administrative endpoints.
-    Rejects unauthenticated requests with HTTP 401 Unauthorized.
-    """
+    """Decorator: requires admin role."""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        admin = get_current_admin()
-        if not admin:
-            return jsonify({
-                "error": "Unauthorized",
-                "message": "Authentication required. Administrator access only."
-            }), 401
+    def wrapper(*args, **kwargs):
+        user = get_current_user()
+        if not user or user["role"] != "admin":
+            return jsonify({"error": "Unauthorized",
+                            "message": "Administrator access only."}), 401
         return f(*args, **kwargs)
-    return decorated_function
+    return wrapper
 
-# -------------------------------------------------------------
-# FRONTEND ROUTES
-# -------------------------------------------------------------
+def faculty_or_admin_required(f):
+    """Decorator: requires faculty or admin role."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        user = get_current_user()
+        if not user or user["role"] not in ("admin", "faculty"):
+            return jsonify({"error": "Unauthorized",
+                            "message": "Authentication required. Please log in as faculty or admin."}), 401
+        return f(*args, **kwargs)
+    return wrapper
+
+# ---------------------------------------------------------------------------
+# Static Frontend Routes
+# ---------------------------------------------------------------------------
 @app.route("/")
 def serve_frontend():
-    """Serves the public research portal (read-only for visitors, admin controls when authenticated)."""
     return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/admin/login")
 @app.route("/login")
 def serve_admin_login():
-    """Serves the dedicated administrative login page."""
     return send_from_directory(app.static_folder, "admin-login.html")
+
+@app.route("/faculty/register")
+def serve_faculty_register():
+    return send_from_directory(app.static_folder, "faculty-register.html")
+
+@app.route("/faculty/login")
+def serve_faculty_login():
+    return send_from_directory(app.static_folder, "faculty-login.html")
+
+@app.route("/faculty/dashboard")
+def serve_faculty_dashboard():
+    return send_from_directory(app.static_folder, "faculty-dashboard.html")
 
 @app.route("/admin/<path:filename>")
 def serve_admin_assets(filename):
-    """Fallback to serve static assets (CSS, JS) if requested with /admin/ prefix."""
-    file_path = os.path.join(app.static_folder, filename)
-    if os.path.exists(file_path):
+    fp = os.path.join(app.static_folder, filename)
+    if os.path.exists(fp):
         return send_from_directory(app.static_folder, filename)
     return send_from_directory(app.static_folder, "admin-login.html")
 
-# -------------------------------------------------------------
-# HEALTHCHECK & SYSTEM STATUS
-# -------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Health Check
+# ---------------------------------------------------------------------------
 @app.route("/api/health", methods=["GET"])
 def health_check():
     db_ok, msg = test_connection()
-    return jsonify({
-        "status": "online" if db_ok else "database_disconnected",
-        "database": msg
-    }), 200 if db_ok else 500
+    return jsonify({"status": "online" if db_ok else "database_disconnected", "database": msg}), \
+           200 if db_ok else 500
 
-# -------------------------------------------------------------
-# ADMIN AUTHENTICATION API ENDPOINTS
-# -------------------------------------------------------------
-@app.route("/api/auth/login", methods=["POST"])
-def admin_login():
-    """
-    Authenticates the administrator.
-    Accepts: { "username": "admin", "password": "..." }
-    Returns: 200 OK with session token, or 401 Unauthorized.
-    """
-    try:
-        data = request.get_json(silent=True)
-        if not data:
-            return jsonify({
-                "error": "Bad Request",
-                "message": "Request body must contain valid JSON credentials."
-            }), 400
-
-        username = str(data.get("username", "")).strip()
-        password = str(data.get("password", ""))
-
-        if not username or not password:
-            return jsonify({
-                "error": "Bad Request",
-                "message": "Both username and password are required."
-            }), 400
-
-        is_valid, admin_info = verify_admin_credentials(username, password)
-        if not is_valid:
-            return jsonify({
-                "error": "Unauthorized",
-                "message": "Invalid username or password."
-            }), 401
-
-        # Generate secure random token
-        token = secrets.token_hex(32)
-        active_tokens[token] = {
-            "username": admin_info["username"],
-            "user_id": admin_info["id"],
-            "created_at": datetime.now().isoformat()
-        }
-
-        # Set secure Flask session
-        session["is_admin"] = True
-        session["admin_username"] = admin_info["username"]
-        session["admin_id"] = admin_info["id"]
-        session["token"] = token
-        session.permanent = True
-
-        return jsonify({
-            "success": True,
-            "message": "Administrator authenticated successfully.",
-            "token": token,
-            "admin": {
-                "username": admin_info["username"],
-                "full_name": admin_info.get("full_name") or "Portal Administrator"
-            }
-        }), 200
-
-    except Exception as e:
-        print(f"[Error] POST /api/auth/login: {e}")
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
-
-@app.route("/api/auth/logout", methods=["POST"])
-def admin_logout():
-    """
-    Terminates the administrative session and invalidates the session token.
-    """
-    try:
-        # Invalidate active token if present
-        auth_header = request.headers.get("Authorization", "").strip()
-        if auth_header.startswith("Bearer "):
-            token = auth_header.split(" ", 1)[1].strip()
-            if token in active_tokens:
-                del active_tokens[token]
-
-        session_token = session.get("token")
-        if session_token and session_token in active_tokens:
-            del active_tokens[session_token]
-
-        # Invalidate Flask session
-        session.clear()
-
-        return jsonify({
-            "success": True,
-            "message": "Administrator logged out successfully. Session invalidated."
-        }), 200
-
-    except Exception as e:
-        print(f"[Error] POST /api/auth/logout: {e}")
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
-
+# ---------------------------------------------------------------------------
+# AUTH: Status (publicly queryable)
+# ---------------------------------------------------------------------------
 @app.route("/api/auth/status", methods=["GET"])
 def auth_status():
-    """
-    Returns current authentication status (publicly queryable).
-    """
-    admin = get_current_admin()
-    if admin:
-        return jsonify({
-            "authenticated": True,
-            "role": "administrator",
-            "username": admin["username"]
-        }), 200
-    else:
-        return jsonify({
-            "authenticated": False,
-            "role": "visitor"
-        }), 200
+    user = get_current_user()
+    if not user:
+        return jsonify({"authenticated": False, "role": "visitor"}), 200
+    if user["role"] == "admin":
+        return jsonify({"authenticated": True, "role": "admin",
+                        "username": user["username"],
+                        "full_name": user.get("full_name")}), 200
+    return jsonify({"authenticated": True, "role": "faculty",
+                    "id":         user["id"],
+                    "email":      user["email"],
+                    "full_name":  user["full_name"],
+                    "department": user.get("department")}), 200
 
-# -------------------------------------------------------------
-# 1. PUBLIC: RETRIEVE ALL RESEARCH OPPORTUNITIES (GET /api/opportunities)
-# -------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# AUTH: Admin Login
+# ---------------------------------------------------------------------------
+@app.route("/api/auth/login", methods=["POST"])
+def admin_login():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Bad Request", "message": "JSON body required."}), 400
+
+    username = str(data.get("username", "")).strip()
+    password = str(data.get("password", ""))
+    if not username or not password:
+        return jsonify({"error": "Bad Request", "message": "Username and password are required."}), 400
+
+    is_valid, admin_info = verify_admin_credentials(username, password)
+    if not is_valid:
+        return jsonify({"error": "Unauthorized", "message": "Invalid username or password."}), 401
+
+    token = secrets.token_hex(32)
+    active_tokens[token] = {
+        "role":      "admin",
+        "id":        admin_info["id"],
+        "username":  admin_info["username"],
+        "full_name": admin_info.get("full_name", "Portal Administrator"),
+        "source":    "token"
+    }
+
+    session["role"]             = "admin"
+    session["is_admin"]         = True
+    session["admin_id"]         = admin_info["id"]
+    session["admin_username"]   = admin_info["username"]
+    session["admin_full_name"]  = admin_info.get("full_name", "Portal Administrator")
+    session["token"]            = token
+    session.permanent           = True
+
+    return jsonify({
+        "success": True,
+        "message": "Administrator authenticated successfully.",
+        "token":   token,
+        "role":    "admin",
+        "admin":   {"username": admin_info["username"],
+                    "full_name": admin_info.get("full_name")}
+    }), 200
+
+# ---------------------------------------------------------------------------
+# AUTH: Admin Logout
+# ---------------------------------------------------------------------------
+@app.route("/api/auth/logout", methods=["POST"])
+def admin_logout():
+    token = _token_from_request() or session.get("token")
+    if token and token in active_tokens:
+        del active_tokens[token]
+    session.clear()
+    return jsonify({"success": True, "message": "Logged out successfully."}), 200
+
+# ---------------------------------------------------------------------------
+# AUTH: Faculty Register
+# ---------------------------------------------------------------------------
+@app.route("/api/faculty/register", methods=["POST"])
+def faculty_register():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Bad Request", "message": "JSON body required."}), 400
+
+    full_name  = str(data.get("full_name", "")).strip()
+    email      = str(data.get("email", "")).strip().lower()
+    department = str(data.get("department", "")).strip()
+    password   = str(data.get("password", ""))
+    confirm    = str(data.get("confirm_password", ""))
+
+    # Validation
+    errors = {}
+    if not full_name:
+        errors["full_name"] = "Full name is required."
+    if not email or not valid_email(email):
+        errors["email"] = "A valid university email address is required."
+    if not department:
+        errors["department"] = "Department is required."
+    if len(password) < 8:
+        errors["password"] = "Password must be at least 8 characters."
+    if password != confirm:
+        errors["confirm_password"] = "Passwords do not match."
+
+    if errors:
+        return jsonify({"error": "Validation Error", "fields": errors}), 422
+
+    success, result = register_faculty(full_name, email, department, password)
+    if not success:
+        return jsonify({"error": "Conflict", "message": result}), 409
+
+    return jsonify({
+        "success": True,
+        "message": "Faculty account created successfully. You can now log in.",
+        "data":    result
+    }), 201
+
+# ---------------------------------------------------------------------------
+# AUTH: Faculty Login
+# ---------------------------------------------------------------------------
+@app.route("/api/faculty/login", methods=["POST"])
+def faculty_login():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Bad Request", "message": "JSON body required."}), 400
+
+    email    = str(data.get("email", "")).strip().lower()
+    password = str(data.get("password", ""))
+    if not email or not password:
+        return jsonify({"error": "Bad Request", "message": "Email and password are required."}), 400
+
+    is_valid, faculty_info = verify_faculty_credentials(email, password)
+    if not is_valid:
+        return jsonify({"error": "Unauthorized", "message": "Invalid email or password."}), 401
+
+    token = secrets.token_hex(32)
+    active_tokens[token] = {
+        "role":       "faculty",
+        "id":         faculty_info["id"],
+        "email":      faculty_info["email"],
+        "full_name":  faculty_info["full_name"],
+        "department": faculty_info["department"],
+        "source":     "token"
+    }
+
+    session["role"]               = "faculty"
+    session["faculty_id"]         = faculty_info["id"]
+    session["faculty_email"]      = faculty_info["email"]
+    session["faculty_full_name"]  = faculty_info["full_name"]
+    session["faculty_department"] = faculty_info["department"]
+    session["token"]              = token
+    session.permanent             = True
+
+    return jsonify({
+        "success":  True,
+        "message":  "Faculty authenticated successfully.",
+        "token":    token,
+        "role":     "faculty",
+        "faculty":  {
+            "id":         faculty_info["id"],
+            "full_name":  faculty_info["full_name"],
+            "email":      faculty_info["email"],
+            "department": faculty_info["department"]
+        }
+    }), 200
+
+# ---------------------------------------------------------------------------
+# AUTH: Faculty Logout
+# ---------------------------------------------------------------------------
+@app.route("/api/faculty/logout", methods=["POST"])
+def faculty_logout():
+    token = _token_from_request() or session.get("token")
+    if token and token in active_tokens:
+        del active_tokens[token]
+    session.clear()
+    return jsonify({"success": True, "message": "Faculty logged out successfully."}), 200
+
+# ---------------------------------------------------------------------------
+# OPPORTUNITIES: GET all (PUBLIC)
+# ---------------------------------------------------------------------------
 @app.route("/api/opportunities", methods=["GET"])
 def get_all_opportunities():
-    """Publicly accessible to all visitors and administrator."""
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM research_opportunities ORDER BY id DESC;")
+            cursor.execute("""
+                SELECT ro.*, f.email AS faculty_email, f.full_name AS faculty_account_name
+                FROM research_opportunities ro
+                LEFT JOIN faculty f ON ro.faculty_id = f.id
+                ORDER BY ro.id DESC;
+            """)
             rows = cursor.fetchall()
         conn.close()
-
-        opportunities = [serialize_row(r) for r in rows]
-        return jsonify({
-            "success": True,
-            "count": len(opportunities),
-            "data": opportunities
-        }), 200
-
+        return jsonify({"success": True, "count": len(rows),
+                        "data": [serialize_row(r) for r in rows]}), 200
     except Exception as e:
         print(f"[Error] GET /api/opportunities: {e}")
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
-# -------------------------------------------------------------
-# 2. PUBLIC: RETRIEVE ONE RESEARCH OPPORTUNITY (GET /api/opportunities/:id)
-# -------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# OPPORTUNITIES: GET one (PUBLIC)
+# ---------------------------------------------------------------------------
 @app.route("/api/opportunities/<int:opp_id>", methods=["GET"])
 def get_opportunity(opp_id):
-    """Publicly accessible to all visitors and administrator."""
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM research_opportunities WHERE id = %s;", (opp_id,))
-            opportunity = cursor.fetchone()
+            cursor.execute("""
+                SELECT ro.*, f.email AS faculty_email
+                FROM research_opportunities ro
+                LEFT JOIN faculty f ON ro.faculty_id = f.id
+                WHERE ro.id = %s;
+            """, (opp_id,))
+            opp = cursor.fetchone()
         conn.close()
-
-        if not opportunity:
-            return jsonify({
-                "error": "Not Found",
-                "message": f"Research opportunity with ID {opp_id} does not exist."
-            }), 404
-
-        return jsonify({
-            "success": True,
-            "data": serialize_row(opportunity)
-        }), 200
-
+        if not opp:
+            return jsonify({"error": "Not Found",
+                            "message": f"Opportunity ID {opp_id} not found."}), 404
+        return jsonify({"success": True, "data": serialize_row(opp)}), 200
     except Exception as e:
-        print(f"[Error] GET /api/opportunities/{opp_id}: {e}")
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
-# -------------------------------------------------------------
-# 3. PROTECTED: CREATE A RESEARCH OPPORTUNITY (POST /api/opportunities)
-# -------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# OPPORTUNITIES: GET my posts (FACULTY only)
+# ---------------------------------------------------------------------------
+@app.route("/api/faculty/opportunities", methods=["GET"])
+@faculty_or_admin_required
+def get_my_opportunities():
+    user = get_current_user()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            if user["role"] == "admin":
+                cursor.execute("SELECT * FROM research_opportunities ORDER BY id DESC;")
+            else:
+                cursor.execute(
+                    "SELECT * FROM research_opportunities WHERE faculty_id = %s ORDER BY id DESC;",
+                    (user["id"],)
+                )
+            rows = cursor.fetchall()
+        conn.close()
+        return jsonify({"success": True, "count": len(rows),
+                        "data": [serialize_row(r) for r in rows]}), 200
+    except Exception as e:
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
+# ---------------------------------------------------------------------------
+# OPPORTUNITIES: CREATE (Faculty or Admin)
+# ---------------------------------------------------------------------------
 @app.route("/api/opportunities", methods=["POST"])
-@admin_required
+@faculty_or_admin_required
 def create_opportunity():
-    """Protected: Only authenticated administrators can create opportunities."""
+    user = get_current_user()
     try:
         data = request.get_json(silent=True)
         if not data:
-            return jsonify({
-                "error": "Bad Request",
-                "message": "Invalid JSON or request body missing."
-            }), 400
+            return jsonify({"error": "Bad Request", "message": "JSON body required."}), 400
 
-        # Required fields validation
-        required_fields = [
-            "title", "description", "research_area", 
-            "faculty_name", "department", "required_skills", 
-            "available_positions", "deadline"
-        ]
-
-        missing = [field for field in required_fields if field not in data or str(data[field]).strip() == ""]
+        required_fields = ["title", "description", "research_area",
+                           "faculty_name", "department", "required_skills",
+                           "available_positions", "deadline"]
+        missing = [f for f in required_fields if not str(data.get(f, "")).strip()]
         if missing:
-            return jsonify({
-                "error": "Bad Request",
-                "message": f"Missing required fields: {', '.join(missing)}"
-            }), 400
+            return jsonify({"error": "Bad Request",
+                            "message": f"Missing required fields: {', '.join(missing)}"}), 400
 
-        title = str(data["title"]).strip()
-        description = str(data["description"]).strip()
-        research_area = str(data["research_area"]).strip()
-        faculty_name = str(data["faculty_name"]).strip()
-        department = str(data["department"]).strip()
-        required_skills = str(data["required_skills"]).strip()
-
-        # Validate available_positions
         try:
-            available_positions = int(data["available_positions"])
-            if available_positions <= 0:
-                return jsonify({
-                    "error": "Bad Request",
-                    "message": "available_positions must be a positive integer greater than 0."
-                }), 400
+            positions = int(data["available_positions"])
+            if positions <= 0:
+                raise ValueError
         except (ValueError, TypeError):
-            return jsonify({
-                "error": "Bad Request",
-                "message": "available_positions must be a valid integer."
-            }), 400
+            return jsonify({"error": "Bad Request",
+                            "message": "available_positions must be a positive integer."}), 400
 
-        # Validate deadline format (YYYY-MM-DD)
         deadline_str = str(data["deadline"]).strip()
         try:
             datetime.strptime(deadline_str, "%Y-%m-%d")
         except ValueError:
-            return jsonify({
-                "error": "Bad Request",
-                "message": "deadline must be formatted as YYYY-MM-DD."
-            }), 400
+            return jsonify({"error": "Bad Request",
+                            "message": "deadline must be YYYY-MM-DD."}), 400
 
-        # Validate status (Optional, defaults to Open)
         status = data.get("status", "Open")
-        if status not in ["Open", "Closed"]:
-            return jsonify({
-                "error": "Bad Request",
-                "message": "status must be either 'Open' or 'Closed'."
-            }), 400
+        if status not in ("Open", "Closed"):
+            return jsonify({"error": "Bad Request",
+                            "message": "status must be 'Open' or 'Closed'."}), 400
 
-        # Insert into database
+        # Link to faculty account if posted by faculty
+        faculty_id = user["id"] if user["role"] == "faculty" else None
+
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            insert_query = """
-                INSERT INTO research_opportunities 
-                (title, description, research_area, faculty_name, department, required_skills, available_positions, deadline, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
-            """
-            cursor.execute(insert_query, (
-                title, description, research_area, faculty_name, 
-                department, required_skills, available_positions, deadline_str, status
+            cursor.execute("""
+                INSERT INTO research_opportunities
+                (title, description, research_area, faculty_name, department,
+                 required_skills, available_positions, deadline, status, faculty_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            """, (
+                str(data["title"]).strip(),
+                str(data["description"]).strip(),
+                str(data["research_area"]).strip(),
+                str(data["faculty_name"]).strip(),
+                str(data["department"]).strip(),
+                str(data["required_skills"]).strip(),
+                positions, deadline_str, status, faculty_id
             ))
             new_id = cursor.lastrowid
-
             cursor.execute("SELECT * FROM research_opportunities WHERE id = %s;", (new_id,))
-            created_opportunity = cursor.fetchone()
+            created = cursor.fetchone()
         conn.close()
 
-        return jsonify({
-            "success": True,
-            "message": "Research opportunity created successfully.",
-            "data": serialize_row(created_opportunity)
-        }), 201
-
+        return jsonify({"success": True,
+                        "message": "Research opportunity created successfully.",
+                        "data": serialize_row(created)}), 201
     except Exception as e:
         print(f"[Error] POST /api/opportunities: {e}")
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
-# -------------------------------------------------------------
-# 4. PROTECTED: UPDATE A RESEARCH OPPORTUNITY (PUT /api/opportunities/:id)
-# -------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# OPPORTUNITIES: UPDATE (Admin = any | Faculty = own only)
+# ---------------------------------------------------------------------------
 @app.route("/api/opportunities/<int:opp_id>", methods=["PUT"])
-@admin_required
+@faculty_or_admin_required
 def update_opportunity(opp_id):
-    """Protected: Only authenticated administrators can update opportunities."""
+    user = get_current_user()
     try:
         data = request.get_json(silent=True)
         if not data:
-            return jsonify({
-                "error": "Bad Request",
-                "message": "Request body must contain valid JSON."
-            }), 400
+            return jsonify({"error": "Bad Request", "message": "JSON body required."}), 400
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            # First verify the resource exists
             cursor.execute("SELECT * FROM research_opportunities WHERE id = %s;", (opp_id,))
             existing = cursor.fetchone()
-            if not existing:
+
+        if not existing:
+            conn.close()
+            return jsonify({"error": "Not Found",
+                            "message": f"Opportunity ID {opp_id} not found."}), 404
+
+        # Ownership check — faculty can only edit their own posts
+        if user["role"] == "faculty":
+            if existing.get("faculty_id") != user["id"]:
                 conn.close()
-                return jsonify({
-                    "error": "Not Found",
-                    "message": f"Cannot update. Opportunity with ID {opp_id} not found."
-                }), 404
+                return jsonify({"error": "Forbidden",
+                                "message": "You are not authorised to edit this opportunity. You can only edit your own posts."}), 403
 
-            # Prepare update fields
-            fields_to_update = {}
-            allowed_fields = [
-                "title", "description", "research_area", 
-                "faculty_name", "department", "required_skills", 
-                "available_positions", "deadline", "status"
-            ]
+        allowed = ["title", "description", "research_area", "faculty_name",
+                   "department", "required_skills", "available_positions", "deadline", "status"]
+        fields_to_update = {}
 
-            for key in allowed_fields:
-                if key in data:
-                    val = data[key]
-                    if key in ["title", "description", "research_area", "faculty_name", "department", "required_skills"]:
-                        if str(val).strip() == "":
-                            conn.close()
-                            return jsonify({
-                                "error": "Bad Request",
-                                "message": f"Field '{key}' cannot be empty."
-                            }), 400
+        with conn.cursor() as cursor:
+            for key in allowed:
+                if key not in data:
+                    continue
+                val = data[key]
+                if key in ("title", "description", "research_area",
+                           "faculty_name", "department", "required_skills"):
+                    if not str(val).strip():
+                        conn.close()
+                        return jsonify({"error": "Bad Request",
+                                        "message": f"'{key}' cannot be empty."}), 400
+                    fields_to_update[key] = str(val).strip()
+                elif key == "available_positions":
+                    try:
+                        n = int(val)
+                        if n <= 0:
+                            raise ValueError
+                        fields_to_update[key] = n
+                    except (ValueError, TypeError):
+                        conn.close()
+                        return jsonify({"error": "Bad Request",
+                                        "message": "available_positions must be a positive integer."}), 400
+                elif key == "deadline":
+                    try:
+                        datetime.strptime(str(val).strip(), "%Y-%m-%d")
                         fields_to_update[key] = str(val).strip()
-
-                    elif key == "available_positions":
-                        try:
-                            num = int(val)
-                            if num <= 0:
-                                conn.close()
-                                return jsonify({
-                                    "error": "Bad Request",
-                                    "message": "available_positions must be greater than 0."
-                                }), 400
-                            fields_to_update[key] = num
-                        except (ValueError, TypeError):
-                            conn.close()
-                            return jsonify({
-                                "error": "Bad Request",
-                                "message": "available_positions must be a valid integer."
-                            }), 400
-
-                    elif key == "deadline":
-                        try:
-                            datetime.strptime(str(val).strip(), "%Y-%m-%d")
-                            fields_to_update[key] = str(val).strip()
-                        except ValueError:
-                            conn.close()
-                            return jsonify({
-                                "error": "Bad Request",
-                                "message": "deadline must be formatted as YYYY-MM-DD."
-                            }), 400
-
-                    elif key == "status":
-                        if val not in ["Open", "Closed"]:
-                            conn.close()
-                            return jsonify({
-                                "error": "Bad Request",
-                                "message": "status must be either 'Open' or 'Closed'."
-                            }), 400
-                        fields_to_update[key] = val
+                    except ValueError:
+                        conn.close()
+                        return jsonify({"error": "Bad Request",
+                                        "message": "deadline must be YYYY-MM-DD."}), 400
+                elif key == "status":
+                    if val not in ("Open", "Closed"):
+                        conn.close()
+                        return jsonify({"error": "Bad Request",
+                                        "message": "status must be 'Open' or 'Closed'."}), 400
+                    fields_to_update[key] = val
 
             if not fields_to_update:
                 conn.close()
-                return jsonify({
-                    "error": "Bad Request",
-                    "message": "No valid fields provided to update."
-                }), 400
+                return jsonify({"error": "Bad Request",
+                                "message": "No valid fields provided."}), 400
 
-            set_clause = ", ".join([f"{k} = %s" for k in fields_to_update.keys()])
+            set_clause = ", ".join([f"{k} = %s" for k in fields_to_update])
             values = list(fields_to_update.values()) + [opp_id]
             cursor.execute(f"UPDATE research_opportunities SET {set_clause} WHERE id = %s;", values)
 
@@ -499,74 +553,65 @@ def update_opportunity(opp_id):
             updated = cursor.fetchone()
         conn.close()
 
-        return jsonify({
-            "success": True,
-            "message": f"Opportunity ID {opp_id} updated successfully.",
-            "data": serialize_row(updated)
-        }), 200
-
+        return jsonify({"success": True,
+                        "message": f"Opportunity ID {opp_id} updated successfully.",
+                        "data": serialize_row(updated)}), 200
     except Exception as e:
         print(f"[Error] PUT /api/opportunities/{opp_id}: {e}")
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
-# -------------------------------------------------------------
-# 5. PROTECTED: DELETE A RESEARCH OPPORTUNITY (DELETE /api/opportunities/:id)
-# -------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# OPPORTUNITIES: DELETE (Admin = any | Faculty = own only)
+# ---------------------------------------------------------------------------
 @app.route("/api/opportunities/<int:opp_id>", methods=["DELETE"])
-@admin_required
+@faculty_or_admin_required
 def delete_opportunity(opp_id):
-    """Protected: Only authenticated administrators can delete opportunities."""
+    user = get_current_user()
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
-            # Check if exists
             cursor.execute("SELECT * FROM research_opportunities WHERE id = %s;", (opp_id,))
             existing = cursor.fetchone()
-            if not existing:
-                conn.close()
-                return jsonify({
-                    "error": "Not Found",
-                    "message": f"Cannot delete. Opportunity with ID {opp_id} not found."
-                }), 404
 
+        if not existing:
+            conn.close()
+            return jsonify({"error": "Not Found",
+                            "message": f"Opportunity ID {opp_id} not found."}), 404
+
+        # Ownership check
+        if user["role"] == "faculty":
+            if existing.get("faculty_id") != user["id"]:
+                conn.close()
+                return jsonify({"error": "Forbidden",
+                                "message": "You are not authorised to delete this opportunity. You can only delete your own posts."}), 403
+
+        with conn.cursor() as cursor:
             cursor.execute("DELETE FROM research_opportunities WHERE id = %s;", (opp_id,))
         conn.close()
 
-        return jsonify({
-            "success": True,
-            "message": f"Research opportunity with ID {opp_id} deleted successfully."
-        }), 200
-
+        return jsonify({"success": True,
+                        "message": f"Opportunity ID {opp_id} deleted successfully."}), 200
     except Exception as e:
         print(f"[Error] DELETE /api/opportunities/{opp_id}: {e}")
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": str(e)
-        }), 500
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
-# -------------------------------------------------------------
-# Error Handlers for 404 / 405
-# -------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Error handlers
+# ---------------------------------------------------------------------------
 @app.errorhandler(404)
 def route_not_found(e):
     if request.path.startswith("/api/"):
-        return jsonify({
-            "error": "Not Found",
-            "message": f"Endpoint '{request.path}' was not found."
-        }), 404
+        return jsonify({"error": "Not Found",
+                        "message": f"Endpoint '{request.path}' not found."}), 404
     return send_from_directory(app.static_folder, "index.html")
 
 @app.errorhandler(405)
 def method_not_allowed(e):
-    return jsonify({
-        "error": "Method Not Allowed",
-        "message": f"Method '{request.method}' is not allowed for this endpoint."
-    }), 405
+    return jsonify({"error": "Method Not Allowed",
+                    "message": f"Method '{request.method}' is not allowed here."}), 405
 
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    print(f"🚀 University Research Opportunity Portal API running on http://127.0.0.1:{port}")
+    print(f"🚀 Research Portal running on http://127.0.0.1:{port}")
     app.run(host="0.0.0.0", port=port, debug=True)

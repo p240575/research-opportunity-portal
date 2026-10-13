@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAST-NUCES | Faculty Dashboard</title>
+  <meta name="description" content="Manage your research opportunity posts — create, edit, and delete your own openings.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0a0e17;--surface:rgba(17,24,39,.88);--border:rgba(255,255,255,.11);--text:#f8fafc;--muted:#94a3b8;--dim:#64748b;--indigo:#6366f1;--indigo-d:#4f46e5;--cyan:#06b6d4;--emerald:#10b981;--rose:#f43f5e;--amber:#f59e0b;--font:'Plus Jakarta Sans',system-ui,sans-serif;--r-sm:8px;--r-md:14px;--r-lg:20px;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+    .glow{position:fixed;border-radius:50%;filter:blur(140px);pointer-events:none;z-index:0;opacity:.28;}
+    .g1{width:600px;height:600px;background:radial-gradient(circle,#6366f1,transparent 70%);top:-200px;right:-150px;}
+    .g2{width:500px;height:500px;background:radial-gradient(circle,#10b981,transparent 70%);bottom:-100px;left:-150px;}
+
+    /* Header */
+    .app-header{position:sticky;top:0;z-index:40;background:rgba(10,14,23,.85);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);}
+    .hdr{max-width:1280px;margin:0 auto;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+    .brand a{display:flex;align-items:center;gap:.85rem;text-decoration:none;}
+    .logo-box{width:42px;height:42px;background:linear-gradient(135deg,var(--indigo),var(--cyan));border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 15px rgba(99,102,241,.4);}
+    .u-tag{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--cyan);display:block;}
+    .p-title{font-size:1.2rem;font-weight:700;letter-spacing:-.02em;background:linear-gradient(to right,#fff,#cbd5e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    .hdr-right{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;padding:.55rem 1rem;font-size:.85rem;font-weight:600;border-radius:var(--r-md);border:none;cursor:pointer;transition:all .2s;font-family:inherit;text-decoration:none;white-space:nowrap;}
+    .btn-sm{padding:.38rem .75rem;font-size:.78rem;border-radius:var(--r-sm);}
+    .btn-primary{background:linear-gradient(135deg,var(--indigo),var(--indigo-d));color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.35);}
+    .btn-primary:hover{background:linear-gradient(135deg,var(--indigo-d),#4338ca);transform:translateY(-1px);}
+    .btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid var(--border);}
+    .btn-ghost:hover{background:rgba(255,255,255,.12);color:#fff;}
+    .btn-danger{background:rgba(244,63,94,.15);color:#fda4af;border:1px solid rgba(244,63,94,.3);}
+    .btn-danger:hover{background:rgba(244,63,94,.25);color:#fff;}
+    .btn-edit{background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.3);}
+    .btn-edit:hover{background:rgba(99,102,241,.25);color:#fff;}
+
+    /* User badge */
+    .user-badge{display:flex;align-items:center;gap:.5rem;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25);border-radius:var(--r-md);padding:.4rem .75rem;font-size:.8rem;font-weight:600;color:#6ee7b7;}
+
+    /* Main */
+    .main-content{max-width:1280px;margin:0 auto;padding:1.5rem 1.5rem 3rem;position:relative;z-index:10;}
+
+    /* Welcome strip */
+    .welcome-strip{background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(6,182,212,.1));border:1px solid rgba(99,102,241,.25);border-radius:var(--r-lg);padding:1.5rem 2rem;margin-bottom:1.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;}
+    .welcome-text h2{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.25rem;}
+    .welcome-text p{font-size:.85rem;color:var(--muted);}
+    .welcome-text strong{color:var(--emerald);}
+
+    /* Metrics */
+    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.75rem;}
+    .metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;}
+    .metric-icon{width:46px;height:46px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .ic-total{background:rgba(99,102,241,.15);color:var(--indigo);}
+    .ic-open{background:rgba(16,185,129,.15);color:var(--emerald);}
+    .ic-closed{background:rgba(244,63,94,.15);color:var(--rose);}
+    .ic-pos{background:rgba(6,182,212,.15);color:var(--cyan);}
+    .metric-val{font-size:1.6rem;font-weight:800;letter-spacing:-.03em;line-height:1;}
+    .metric-lbl{font-size:.75rem;color:var(--muted);margin-top:.2rem;}
+
+    /* Section header */
+    .section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem;flex-wrap:wrap;gap:.75rem;}
+    .section-hdr h3{font-size:1.05rem;font-weight:700;}
+
+    /* Table card */
+    .table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+    .table-scroll{overflow-x:auto;}
+    table{width:100%;border-collapse:collapse;font-size:.84rem;}
+    thead{background:rgba(255,255,255,.03);}
+    th{padding:.85rem 1rem;text-align:left;font-weight:700;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap;}
+    td{padding:.85rem 1rem;border-top:1px solid var(--border);vertical-align:middle;}
+    tr:hover td{background:rgba(255,255,255,.02);}
+    .opp-title{font-weight:600;color:#e2e8f0;max-width:240px;}
+    .opp-title small{display:block;font-size:.74rem;color:var(--muted);font-weight:400;margin-top:.15rem;}
+    .status-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .6rem;border-radius:6px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+    .badge-open{background:rgba(16,185,129,.15);color:#6ee7b7;border:1px solid rgba(16,185,129,.25);}
+    .badge-closed{background:rgba(244,63,94,.12);color:#fda4af;border:1px solid rgba(244,63,94,.2);}
+    .actions{display:flex;gap:.4rem;}
+    .empty-table{text-align:center;padding:3rem 1rem;color:var(--muted);}
+    .empty-table svg{opacity:.3;margin-bottom:.75rem;}
+
+    /* Toast */
+    .toast-container{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;}
+    .toast{display:flex;align-items:flex-start;gap:.6rem;padding:.8rem 1rem;border-radius:var(--r-md);backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:260px;max-width:350px;animation:toastIn .3s ease;font-size:.83rem;font-weight:500;}
+    .toast.success{background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.35);color:#a7f3d0;}
+    .toast.error{background:rgba(244,63,94,.2);border:1px solid rgba(244,63,94,.35);color:#fecdd3;}
+    .toast.info{background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.35);color:#a5b4fc;}
+    @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;}
+    .modal-window{background:#111827;border:1px solid var(--border);border-radius:var(--r-lg);max-width:640px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.6);}
+    .modal-header{display:flex;align-items:flex-start;justify-content:space-between;padding:1.5rem 1.75rem 1rem;border-bottom:1px solid var(--border);}
+    .modal-title{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;}
+    .modal-sub{font-size:.8rem;color:var(--muted);margin-top:.2rem;}
+    .btn-close{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--muted);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:1.1rem;line-height:1;transition:all .2s;flex-shrink:0;}
+    .btn-close:hover{background:rgba(255,255,255,.15);color:#fff;}
+    .modal-body{padding:1.5rem 1.75rem;}
+    .modal-footer{display:flex;justify-content:flex-end;gap:.65rem;padding:1rem 1.75rem 1.5rem;border-top:1px solid var(--border);}
+
+    /* Form */
+    .form-group{margin-bottom:1.1rem;}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+    label{display:block;font-size:.8rem;font-weight:600;color:#cbd5e1;margin-bottom:.4rem;}
+    .req{color:var(--rose);}
+    .field{width:100%;padding:.65rem .9rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-md);color:#fff;font-size:.88rem;font-family:inherit;transition:all .2s;}
+    .field:focus{outline:none;border-color:var(--indigo);background:rgba(255,255,255,.07);box-shadow:0 0 0 3px rgba(99,102,241,.25);}
+    .field::placeholder{color:var(--dim);}
+    textarea.field{resize:vertical;min-height:90px;}
+    .field-err{display:block;font-size:.74rem;color:#fda4af;margin-top:.25rem;min-height:.9rem;}
+
+    /* Confirm dialog */
+    .confirm-icon{width:56px;height:56px;background:rgba(244,63,94,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;color:var(--rose);}
+    .confirm-title{text-align:center;font-size:1.1rem;font-weight:800;margin-bottom:.5rem;}
+    .confirm-text{text-align:center;font-size:.85rem;color:var(--muted);line-height:1.55;}
+
+    .hidden{display:none!important;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:640px){.form-row{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+  <div class="glow g1"></div>
+  <div class="glow g2"></div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="hdr">
+      <div class="brand">
+        <a href="/">
+          <div class="logo-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div>
+            <span class="u-tag">FAST-NUCES Peshawar</span>
+            <span class="p-title">Research Opportunity Portal</span>
+          </div>
+        </a>
+      </div>
+      <div class="hdr-right">
+        <div class="user-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          </svg>
+          <span id="hdrUserName">Faculty</span>
+        </div>
+        <a href="/" class="btn btn-ghost btn-sm">Public Portal</a>
+        <button id="btnLogout" class="btn btn-ghost btn-sm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="main-content">
+
+    <!-- Welcome strip -->
+    <div class="welcome-strip">
+      <div class="welcome-text">
+        <h2>Faculty Dashboard</h2>
+        <p>Welcome back, <strong id="welcomeName">Loading...</strong> — manage your research opportunity posts below.</p>
+      </div>
+      <button id="btnCreateNew" class="btn btn-primary">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Post New Opportunity
+      </button>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="metric-icon ic-total">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+        </div>
+        <div><div class="metric-val" id="mTotal">0</div><div class="metric-lbl">My Posts</div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon ic-open">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div><div class="metric-val" id="mOpen" style="color:#10b981">0</div><div class="metric-lbl">Open</div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon ic-closed">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <div><div class="metric-val" id="mClosed" style="color:#f43f5e">0</div><div class="metric-lbl">Closed</div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon ic-pos">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div><div class="metric-val" id="mPositions" style="color:#06b6d4">0</div><div class="metric-lbl">Total Seats</div></div>
+      </div>
+    </div>
+
+    <!-- Posts table -->
+    <div class="section-hdr">
+      <h3>My Research Opportunities</h3>
+      <button id="btnRefresh" class="btn btn-ghost btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-scroll">
+        <table id="oppTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Title / Area</th>
+              <th>Department</th>
+              <th>Deadline</th>
+              <th>Positions</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="oppTableBody">
+            <tr><td colspan="7" class="empty-table">
+              <div style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#6366f1;border-radius:50%;animation:spin .8s linear infinite;"></div>
+              <p style="margin-top:.5rem">Loading your opportunities...</p>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===== MODAL: CREATE / EDIT ===== -->
+  <div id="formModal" class="modal-backdrop hidden">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle" class="modal-title">Post New Opportunity</h2>
+          <p class="modal-sub">Fill in the details for your research opening.</p>
+        </div>
+        <button id="btnCloseForm" class="btn-close">&times;</button>
+      </div>
+      <form id="oppForm" novalidate>
+        <input type="hidden" id="oppId">
+        <div class="modal-body">
+
+          <div class="form-group">
+            <label for="oppTitle">Research Title <span class="req">*</span></label>
+            <input class="field" id="oppTitle" type="text" placeholder="e.g. AI-Driven SDN Latency Reduction" required>
+            <span class="field-err" id="e_title"></span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="oppFaculty">Faculty / Supervisor Name <span class="req">*</span></label>
+              <input class="field" id="oppFaculty" type="text" placeholder="e.g. Dr. Tariq Khan" required>
+              <span class="field-err" id="e_faculty"></span>
+            </div>
+            <div class="form-group">
+              <label for="oppDept">Department <span class="req">*</span></label>
+              <input class="field" id="oppDept" type="text" placeholder="e.g. Computer Science" required>
+              <span class="field-err" id="e_dept"></span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="oppArea">Research Area <span class="req">*</span></label>
+              <input class="field" id="oppArea" type="text" placeholder="e.g. Computer Networks / SDN" required>
+              <span class="field-err" id="e_area"></span>
+            </div>
+            <div class="form-group">
+              <label for="oppPositions">Available Positions <span class="req">*</span></label>
+              <input class="field" id="oppPositions" type="number" min="1" max="50" placeholder="e.g. 2" required>
+              <span class="field-err" id="e_positions"></span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="oppDeadline">Application Deadline <span class="req">*</span></label>
+              <input class="field" id="oppDeadline" type="date" required>
+              <span class="field-err" id="e_deadline"></span>
+            </div>
+            <div class="form-group">
+              <label for="oppStatus">Status <span class="req">*</span></label>
+              <select class="field" id="oppStatus">
+                <option value="Open">Open</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="oppSkills">Required Skills <span class="req">*</span></label>
+            <input class="field" id="oppSkills" type="text" placeholder="e.g. Python, Mininet, PyTorch (comma-separated)" required>
+            <span class="field-err" id="e_skills"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="oppDesc">Research Description <span class="req">*</span></label>
+            <textarea class="field" id="oppDesc" rows="4" placeholder="Detail research objectives, duties, and deliverables..." required></textarea>
+            <span class="field-err" id="e_desc"></span>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btnCancelForm" class="btn btn-ghost">Cancel</button>
+          <button type="submit" id="btnSubmitForm" class="btn btn-primary">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            Save Opportunity
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: CONFIRM DELETE ===== -->
+  <div id="deleteModal" class="modal-backdrop hidden">
+    <div class="modal-window" style="max-width:400px;">
+      <div class="modal-body" style="padding-top:2rem;">
+        <div class="confirm-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h3 class="confirm-title">Delete Opportunity?</h3>
+        <p class="confirm-text">Are you sure you want to permanently delete <strong id="delTitle">"this opportunity"</strong>? This cannot be undone.</p>
+      </div>
+      <div class="modal-footer" style="justify-content:center;">
+        <button id="btnCancelDelete" class="btn btn-ghost">Cancel</button>
+        <button id="btnConfirmDelete" class="btn btn-danger">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+          </svg>
+          Confirm Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script>
+    // ─── State ────────────────────────────────────────────────────────────────
+    let myOpps       = [];
+    let pendingDelId = null;
+    let currentUser  = null;
+
+    const FACULTY_BASE = '/api/faculty';
+    const OPP_BASE     = '/api/opportunities';
+
+    // ─── Auth headers ─────────────────────────────────────────────────────────
+    function authHeaders() {
+      const token = localStorage.getItem('faculty_token');
+      const h = { 'Content-Type': 'application/json' };
+      if (token) h['Authorization'] = `Bearer ${token}`;
+      return h;
+    }
+
+    // ─── Init ──────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+      await verifyAuth();
+      await loadMyOpportunities();
+      setupListeners();
+    });
+
+    async function verifyAuth() {
+      try {
+        const res  = await fetch('/api/auth/status', { headers: authHeaders(), credentials: 'include' });
+        const data = await res.json();
+        if (!data.authenticated || data.role !== 'faculty') {
+          // Not logged in as faculty — redirect
+          window.location.href = '/faculty/login';
+          return;
+        }
+        currentUser = data;
+        document.getElementById('hdrUserName').textContent = data.full_name || data.email;
+        document.getElementById('welcomeName').textContent  = data.full_name || data.email;
+      } catch {
+        window.location.href = '/faculty/login';
+      }
+    }
+
+    // ─── Load opportunities ───────────────────────────────────────────────────
+    async function loadMyOpportunities() {
+      try {
+        const res  = await fetch(`${FACULTY_BASE}/opportunities`, {
+          headers: authHeaders(), credentials: 'include'
+        });
+        const data = await res.json();
+        if (res.ok) {
+          myOpps = data.data || [];
+          renderTable();
+          updateMetrics();
+        } else {
+          showToast(data.message || 'Failed to load opportunities.', 'error');
+        }
+      } catch {
+        showToast('Network error while loading opportunities.', 'error');
+      }
+    }
+
+    function updateMetrics() {
+      const open    = myOpps.filter(o => o.status === 'Open');
+      const closed  = myOpps.filter(o => o.status === 'Closed');
+      const seats   = myOpps.reduce((s, o) => s + (parseInt(o.available_positions) || 0), 0);
+      document.getElementById('mTotal').textContent     = myOpps.length;
+      document.getElementById('mOpen').textContent      = open.length;
+      document.getElementById('mClosed').textContent    = closed.length;
+      document.getElementById('mPositions').textContent = seats;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('oppTableBody');
+      if (!myOpps.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-table">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <p>You haven't posted any research opportunities yet.</p>
+          <button onclick="openCreateModal()" class="btn btn-primary btn-sm" style="margin-top:.75rem;">Post Your First Opportunity</button>
+        </td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = myOpps.map(o => `
+        <tr>
+          <td style="color:var(--dim);font-size:.78rem;">#${o.id}</td>
+          <td class="opp-title">
+            ${escHtml(o.title)}
+            <small>${escHtml(o.research_area)}</small>
+          </td>
+          <td style="color:var(--muted);font-size:.82rem;">${escHtml(o.department)}</td>
+          <td style="color:var(--muted);font-size:.82rem;">${o.deadline || '—'}</td>
+          <td style="text-align:center;font-weight:700;">${o.available_positions}</td>
+          <td>
+            <span class="status-badge ${o.status === 'Open' ? 'badge-open' : 'badge-closed'}">
+              ${o.status}
+            </span>
+          </td>
+          <td>
+            <div class="actions">
+              <button class="btn btn-edit btn-sm" onclick="openEditModal(${o.id})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Edit
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${o.id})">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                </svg>
+                Delete
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ─── Modal helpers ────────────────────────────────────────────────────────
+    function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden');    }
+
+    function clearFormErrors() {
+      ['e_title','e_faculty','e_dept','e_area','e_positions','e_deadline','e_skills','e_desc']
+        .forEach(id => { document.getElementById(id).textContent = ''; });
+    }
+
+    function openCreateModal() {
+      clearFormErrors();
+      document.getElementById('oppId').value    = '';
+      document.getElementById('oppForm').reset();
+      document.getElementById('modalTitle').textContent = 'Post New Research Opportunity';
+      // Pre-fill faculty name from profile
+      if (currentUser?.full_name) {
+        document.getElementById('oppFaculty').value = currentUser.full_name;
+      }
+      if (currentUser?.department) {
+        document.getElementById('oppDept').value = currentUser.department;
+      }
+      openModal('formModal');
+    }
+
+    function openEditModal(id) {
+      const opp = myOpps.find(o => o.id === id);
+      if (!opp) return;
+      clearFormErrors();
+      document.getElementById('oppId').value        = opp.id;
+      document.getElementById('oppTitle').value     = opp.title;
+      document.getElementById('oppFaculty').value   = opp.faculty_name;
+      document.getElementById('oppDept').value      = opp.department;
+      document.getElementById('oppArea').value      = opp.research_area;
+      document.getElementById('oppPositions').value = opp.available_positions;
+      document.getElementById('oppDeadline').value  = opp.deadline;
+      document.getElementById('oppStatus').value    = opp.status;
+      document.getElementById('oppSkills').value    = opp.required_skills;
+      document.getElementById('oppDesc').value      = opp.description;
+      document.getElementById('modalTitle').textContent = 'Edit Research Opportunity';
+      openModal('formModal');
+    }
+
+    function openDeleteModal(id) {
+      const opp = myOpps.find(o => o.id === id);
+      if (!opp) return;
+      pendingDelId = id;
+      document.getElementById('delTitle').textContent = opp.title;
+      openModal('deleteModal');
+    }
+
+    // ─── Form Submit (Create / Update) ────────────────────────────────────────
+    document.getElementById('oppForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearFormErrors();
+
+      const id         = document.getElementById('oppId').value;
+      const title      = document.getElementById('oppTitle').value.trim();
+      const faculty    = document.getElementById('oppFaculty').value.trim();
+      const dept       = document.getElementById('oppDept').value.trim();
+      const area       = document.getElementById('oppArea').value.trim();
+      const positions  = document.getElementById('oppPositions').value;
+      const deadline   = document.getElementById('oppDeadline').value;
+      const status     = document.getElementById('oppStatus').value;
+      const skills     = document.getElementById('oppSkills').value.trim();
+      const desc       = document.getElementById('oppDesc').value.trim();
+
+      let valid = true;
+      if (!title)    { document.getElementById('e_title').textContent    = 'Title is required.';             valid=false; }
+      if (!faculty)  { document.getElementById('e_faculty').textContent  = 'Faculty name is required.';      valid=false; }
+      if (!dept)     { document.getElementById('e_dept').textContent     = 'Department is required.';        valid=false; }
+      if (!area)     { document.getElementById('e_area').textContent     = 'Research area is required.';     valid=false; }
+      if (!positions || parseInt(positions) <= 0) { document.getElementById('e_positions').textContent = 'Must be ≥ 1.'; valid=false; }
+      if (!deadline) { document.getElementById('e_deadline').textContent = 'Deadline is required.';          valid=false; }
+      if (!skills)   { document.getElementById('e_skills').textContent   = 'Required skills are required.';  valid=false; }
+      if (!desc)     { document.getElementById('e_desc').textContent     = 'Description is required.';       valid=false; }
+      if (!valid) return;
+
+      const payload = {
+        title, faculty_name: faculty, department: dept,
+        research_area: area, available_positions: parseInt(positions),
+        deadline, status, required_skills: skills, description: desc
+      };
+
+      const btn = document.getElementById('btnSubmitForm');
+      btn.disabled = true;
+      btn.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></span>&nbsp;Saving...`;
+
+      try {
+        const isEdit = !!id;
+        const url    = isEdit ? `${OPP_BASE}/${id}` : OPP_BASE;
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const res  = await fetch(url, {
+          method,
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(data.message || 'Operation failed.', 'error');
+          return;
+        }
+
+        closeModal('formModal');
+        showToast(isEdit ? 'Opportunity updated successfully.' : 'Opportunity created successfully.', 'success');
+        await loadMyOpportunities();
+      } catch {
+        showToast('Network error. Please try again.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Save Opportunity`;
+      }
+    });
+
+    // ─── Delete ───────────────────────────────────────────────────────────────
+    document.getElementById('btnConfirmDelete').addEventListener('click', async () => {
+      if (!pendingDelId) return;
+      const btn = document.getElementById('btnConfirmDelete');
+      btn.disabled = true;
+
+      try {
+        const res  = await fetch(`${OPP_BASE}/${pendingDelId}`, {
+          method: 'DELETE',
+          headers: authHeaders(),
+          credentials: 'include'
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(data.message || 'Delete failed.', 'error');
+          return;
+        }
+        closeModal('deleteModal');
+        showToast('Opportunity deleted successfully.', 'success');
+        pendingDelId = null;
+        await loadMyOpportunities();
+      } catch {
+        showToast('Network error. Please try again.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ─── Logout ───────────────────────────────────────────────────────────────
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+      try {
+        await fetch('/api/faculty/logout', {
+          method: 'POST', headers: authHeaders(), credentials: 'include'
+        });
+      } catch {}
+      localStorage.removeItem('faculty_token');
+      localStorage.removeItem('faculty_user');
+      window.location.href = '/';
+    });
+
+    // ─── Listeners ────────────────────────────────────────────────────────────
+    function setupListeners() {
+      document.getElementById('btnCreateNew').addEventListener('click', openCreateModal);
+      document.getElementById('btnRefresh').addEventListener('click', loadMyOpportunities);
+      document.getElementById('btnCloseForm').addEventListener('click', () => closeModal('formModal'));
+      document.getElementById('btnCancelForm').addEventListener('click', () => closeModal('formModal'));
+      document.getElementById('btnCancelDelete').addEventListener('click', () => closeModal('deleteModal'));
+
+      // Close on backdrop click
+      document.getElementById('formModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal('formModal');
+      });
+      document.getElementById('deleteModal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal('deleteModal');
+      });
+
+      window.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { closeModal('formModal'); closeModal('deleteModal'); }
+      });
+    }
+
+    // ─── Utilities ────────────────────────────────────────────────────────────
+    function escHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str || '';
+      return d.innerHTML;
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const icons = {
+        success: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+        error:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+        info:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+      };
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `${icons[type] || icons.info}<span>${escHtml(msg)}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+  </script>
+</body>
+</html>

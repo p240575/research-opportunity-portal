@@ -1,84 +1,75 @@
 /**
  * FAST-NUCES Research Opportunity Portal
- * Frontend Application Controller
- * Handles REST API communication, Role-Based Access Control (RBAC),
- * public visitor view, admin authentication, CRUD operations, and validations.
+ * Frontend Application Controller — Three-Role RBAC
+ * Roles: visitor (read-only) | faculty (manage own posts) | admin (manage all)
  */
 
-const API_BASE = '/api/opportunities';
+const API_BASE  = '/api/opportunities';
 const AUTH_BASE = '/api/auth';
 
-// Application State
-let isAdmin = false;
-let currentAdminUser = null;
-let opportunities = [];
-let departmentsList = new Set();
-let currentFilter = {
-  search: '',
-  status: 'ALL',
-  department: 'ALL'
-};
-let pendingDeleteId = null;
+// ─── Application State ────────────────────────────────────────────────────────
+let currentRole  = 'visitor'; // 'visitor' | 'faculty' | 'admin'
+let currentUser  = null;      // { username, full_name, email, ... }
+let isAdmin      = false;     // legacy flag kept for backward compat
+let opportunities    = [];
+let departmentsList  = new Set();
+let currentFilter    = { search: '', status: 'ALL', department: 'ALL' };
+let pendingDeleteId  = null;
 
-// DOM Elements - Navigation & Auth
-const dbStatusBadge = document.getElementById('dbStatusBadge');
-const authBadge = document.getElementById('authBadge');
-const authBadgeText = document.getElementById('authBadgeText');
-const btnGoToLogin = document.getElementById('btnGoToLogin');
-const btnLogoutAdmin = document.getElementById('btnLogoutAdmin');
-const roleNoticeBanner = document.getElementById('roleNoticeBanner');
-const bannerMessage = document.getElementById('bannerMessage');
+// ─── DOM Elements ─────────────────────────────────────────────────────────────
+const dbStatusBadge        = document.getElementById('dbStatusBadge');
+const authBadge            = document.getElementById('authBadge');
+const authBadgeText        = document.getElementById('authBadgeText');
+const btnGoToLogin         = document.getElementById('btnGoToLogin');
+const btnFacultyLogin      = document.getElementById('btnFacultyLogin');
+const btnFacultyDashboard  = document.getElementById('btnFacultyDashboard');
+const btnLogoutAdmin       = document.getElementById('btnLogoutAdmin');
+const btnLogoutFaculty     = document.getElementById('btnLogoutFaculty');
+const roleNoticeBanner     = document.getElementById('roleNoticeBanner');
+const bannerMessage        = document.getElementById('bannerMessage');
 
-// DOM Elements - Content & Filters
 const opportunitiesContainer = document.getElementById('opportunitiesContainer');
-const emptyState = document.getElementById('emptyState');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const searchInput = document.getElementById('searchInput');
-const filterStatus = document.getElementById('filterStatus');
-const filterDepartment = document.getElementById('filterDepartment');
-const btnRefresh = document.getElementById('btnRefresh');
-const btnResetFilters = document.getElementById('btnResetFilters');
+const emptyState             = document.getElementById('emptyState');
+const loadingIndicator       = document.getElementById('loadingIndicator');
+const searchInput            = document.getElementById('searchInput');
+const filterStatus           = document.getElementById('filterStatus');
+const filterDepartment       = document.getElementById('filterDepartment');
+const btnRefresh             = document.getElementById('btnRefresh');
+const btnResetFilters        = document.getElementById('btnResetFilters');
 
-// Metrics Elements
-const statTotal = document.getElementById('statTotal');
-const statOpen = document.getElementById('statOpen');
+const statTotal     = document.getElementById('statTotal');
+const statOpen      = document.getElementById('statOpen');
 const statPositions = document.getElementById('statPositions');
-const statDepts = document.getElementById('statDepts');
+const statDepts     = document.getElementById('statDepts');
 
-// Form Modal Elements (Admin Only)
-const opportunityModal = document.getElementById('opportunityModal');
-const modalTitle = document.getElementById('modalTitle');
-const opportunityForm = document.getElementById('opportunityForm');
-const btnOpenCreateModal = document.getElementById('btnOpenCreateModal');
-const btnCloseModal = document.getElementById('btnCloseModal');
-const btnCancelModal = document.getElementById('btnCancelModal');
+const opportunityModal  = document.getElementById('opportunityModal');
+const modalTitle        = document.getElementById('modalTitle');
+const opportunityForm   = document.getElementById('opportunityForm');
+const btnOpenCreateModal= document.getElementById('btnOpenCreateModal');
+const btnCloseModal     = document.getElementById('btnCloseModal');
+const btnCancelModal    = document.getElementById('btnCancelModal');
 
-// Form Input Elements
-const oppId = document.getElementById('oppId');
-const oppTitle = document.getElementById('oppTitle');
-const oppFaculty = document.getElementById('oppFaculty');
-const oppDepartment = document.getElementById('oppDepartment');
-const oppArea = document.getElementById('oppArea');
-const oppPositions = document.getElementById('oppPositions');
-const oppDeadline = document.getElementById('oppDeadline');
-const oppStatus = document.getElementById('oppStatus');
-const oppSkills = document.getElementById('oppSkills');
+const oppId          = document.getElementById('oppId');
+const oppTitle       = document.getElementById('oppTitle');
+const oppFaculty     = document.getElementById('oppFaculty');
+const oppDepartment  = document.getElementById('oppDepartment');
+const oppArea        = document.getElementById('oppArea');
+const oppPositions   = document.getElementById('oppPositions');
+const oppDeadline    = document.getElementById('oppDeadline');
+const oppStatus      = document.getElementById('oppStatus');
+const oppSkills      = document.getElementById('oppSkills');
 const oppDescription = document.getElementById('oppDescription');
 
-// Detail Modal Elements (Public & Admin)
-const detailsModal = document.getElementById('detailsModal');
-const btnCloseDetails = document.getElementById('btnCloseDetails');
+const detailsModal       = document.getElementById('detailsModal');
+const btnCloseDetails    = document.getElementById('btnCloseDetails');
 const btnCloseDetailsBtn = document.getElementById('btnCloseDetailsBtn');
 
-// Delete Modal Elements (Admin Only)
-const deleteModal = document.getElementById('deleteModal');
-const deleteOppTitle = document.getElementById('deleteOppTitle');
-const btnCancelDelete = document.getElementById('btnCancelDelete');
+const deleteModal      = document.getElementById('deleteModal');
+const deleteOppTitle   = document.getElementById('deleteOppTitle');
+const btnCancelDelete  = document.getElementById('btnCancelDelete');
 const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 
-// ==============================================================
-// INITIALIZATION
-// ==============================================================
+// ─── Initialisation ───────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   checkApiHealth();
   await checkAuthStatus();
@@ -86,140 +77,166 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
 });
 
+// ─── Auth Headers ─────────────────────────────────────────────────────────────
 function getAuthHeaders() {
-  const token = localStorage.getItem('admin_token');
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  const adminToken   = localStorage.getItem('admin_token');
+  const facultyToken = localStorage.getItem('faculty_token');
+  const token        = adminToken || facultyToken;
+  const headers      = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;
 }
 
-// ==============================================================
-// AUTHENTICATION & ROLE MANAGEMENT
-// ==============================================================
-
+// ─── Auth Status ──────────────────────────────────────────────────────────────
 async function checkAuthStatus() {
   try {
-    const res = await fetch(`${AUTH_BASE}/status`, {
+    const res  = await fetch(`${AUTH_BASE}/status`, {
       headers: getAuthHeaders(),
       credentials: 'include'
     });
     const data = await res.json();
 
     if (res.ok && data.authenticated) {
-      isAdmin = true;
-      currentAdminUser = { username: data.username || 'admin' };
-      updateRoleUI(true);
+      currentRole = data.role;   // 'admin' or 'faculty'
+      currentUser = data;
+      isAdmin     = currentRole === 'admin';
+      updateRoleUI();
     } else {
-      isAdmin = false;
-      currentAdminUser = null;
+      currentRole = 'visitor';
+      currentUser = null;
+      isAdmin     = false;
       localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_user');
-      updateRoleUI(false);
+      localStorage.removeItem('faculty_token');
+      localStorage.removeItem('faculty_user');
+      updateRoleUI();
     }
-  } catch (err) {
-    console.warn('Could not verify auth status:', err);
-    isAdmin = false;
-    updateRoleUI(false);
+  } catch {
+    currentRole = 'visitor';
+    isAdmin     = false;
+    updateRoleUI();
   }
 }
 
-function updateRoleUI(adminLoggedIn) {
-  const adminOnlyElements = document.querySelectorAll('.admin-only');
-  const visitorOnlyElements = document.querySelectorAll('.visitor-only');
+// ─── Role UI ──────────────────────────────────────────────────────────────────
+function updateRoleUI() {
+  const adminEls   = document.querySelectorAll('.admin-only');
+  const facultyEls = document.querySelectorAll('.faculty-only');
+  const visitorEls = document.querySelectorAll('.visitor-only');
 
-  if (adminLoggedIn) {
-    // Show admin controls
-    adminOnlyElements.forEach(el => el.classList.remove('hidden'));
-    visitorOnlyElements.forEach(el => el.classList.add('hidden'));
+  // Reset all
+  adminEls.forEach(el   => el.classList.add('hidden'));
+  facultyEls.forEach(el => el.classList.add('hidden'));
+  visitorEls.forEach(el => el.classList.remove('hidden'));
+
+  if (currentRole === 'admin') {
+    adminEls.forEach(el   => el.classList.remove('hidden'));
+    visitorEls.forEach(el => el.classList.add('hidden'));
 
     authBadge.className = 'auth-role-badge admin';
-    authBadge.innerHTML = `<span class="role-icon">🛡️</span><span>Admin: ${escapeHtml(currentAdminUser?.username || 'admin')}</span>`;
+    authBadge.innerHTML = `<span class="role-icon">🛡️</span><span>Admin: ${escapeHtml(currentUser?.username || 'admin')}</span>`;
 
-    if (roleNoticeBanner && bannerMessage) {
-      roleNoticeBanner.className = 'role-banner admin-banner';
-      bannerMessage.innerHTML = `Administrator Mode Active: You are authenticated as <strong>${escapeHtml(currentAdminUser?.username || 'admin')}</strong> with full management permissions (Create, Edit, Close/Reopen, and Delete).`;
-    }
+    roleNoticeBanner.className = 'role-banner admin-banner';
+    bannerMessage.innerHTML    = `<strong>Administrator Mode</strong> — You are authenticated as <strong>${escapeHtml(currentUser?.username || 'admin')}</strong>. You have full CRUD access over all research opportunities.`;
+
+  } else if (currentRole === 'faculty') {
+    facultyEls.forEach(el => el.classList.remove('hidden'));
+    visitorEls.forEach(el => el.classList.add('hidden'));
+
+    authBadge.className = 'auth-role-badge faculty';
+    authBadge.innerHTML = `<span class="role-icon">🎓</span><span>Faculty: ${escapeHtml(currentUser?.full_name || currentUser?.email || '')}</span>`;
+
+    roleNoticeBanner.className = 'role-banner faculty-banner';
+    bannerMessage.innerHTML    = `<strong>Faculty Mode</strong> — Welcome, <strong>${escapeHtml(currentUser?.full_name || '')}</strong>. Go to your <a href="/faculty/dashboard" style="color:#06b6d4;font-weight:600;">Dashboard</a> to post and manage your own research opportunities.`;
+
   } else {
-    // Visitor Mode (Strict Read-Only)
-    adminOnlyElements.forEach(el => el.classList.add('hidden'));
-    visitorOnlyElements.forEach(el => el.classList.remove('hidden'));
-
+    // Visitor
     authBadge.className = 'auth-role-badge visitor';
     authBadge.innerHTML = `<span class="role-icon">👤</span><span>Visitor (Read-Only)</span>`;
 
-    if (roleNoticeBanner && bannerMessage) {
-      roleNoticeBanner.className = 'role-banner visitor-banner';
-      bannerMessage.innerHTML = `You are currently browsing research opportunities as a <strong>Visitor (Read-Only)</strong>. No login or registration required. Administrative CRUD controls are restricted to the verified portal administrator.`;
-    }
+    roleNoticeBanner.className = 'role-banner visitor-banner';
+    bannerMessage.innerHTML    = `You are browsing as a <strong>Visitor (Read-Only)</strong>. <a href="/faculty/register" style="color:#06b6d4;font-weight:600;">Register as faculty</a> to post research opportunities, or <a href="/faculty/login" style="color:#06b6d4;font-weight:600;">sign in</a> if you already have an account.`;
   }
 }
 
+// ─── Logout Handlers ──────────────────────────────────────────────────────────
 async function handleAdminLogout() {
   try {
-    const res = await fetch(`${AUTH_BASE}/logout`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      credentials: 'include'
+    await fetch(`${AUTH_BASE}/logout`, {
+      method: 'POST', headers: getAuthHeaders(), credentials: 'include'
     });
-    
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
-    isAdmin = false;
-    currentAdminUser = null;
-    updateRoleUI(false);
-    renderFilteredOpportunities();
-    showToast('Administrator logged out. Switched to public visitor mode.', 'info');
-  } catch (err) {
-    showToast('Logout encountered an issue.', 'error');
+  } catch {}
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_user');
+  currentRole = 'visitor'; currentUser = null; isAdmin = false;
+  updateRoleUI();
+  renderFilteredOpportunities();
+  showToast('Administrator logged out. Switched to visitor mode.', 'info');
+}
+
+async function handleFacultyLogout() {
+  try {
+    await fetch('/api/faculty/logout', {
+      method: 'POST', headers: getAuthHeaders(), credentials: 'include'
+    });
+  } catch {}
+  localStorage.removeItem('faculty_token');
+  localStorage.removeItem('faculty_user');
+  currentRole = 'visitor'; currentUser = null; isAdmin = false;
+  updateRoleUI();
+  renderFilteredOpportunities();
+  showToast('Logged out. Switched to visitor mode.', 'info');
+}
+
+// ─── API Health ───────────────────────────────────────────────────────────────
+async function checkApiHealth() {
+  try {
+    const res  = await fetch('/api/health');
+    const data = await res.json();
+    if (data.status === 'online') {
+      dbStatusBadge.className = 'connection-status connected';
+      dbStatusBadge.innerHTML = `<span class="status-dot"></span><span class="status-text">API Online</span>`;
+    } else {
+      dbStatusBadge.className = 'connection-status disconnected';
+      dbStatusBadge.innerHTML = `<span class="status-dot"></span><span class="status-text">DB Offline</span>`;
+    }
+  } catch {
+    dbStatusBadge.className = 'connection-status disconnected';
+    dbStatusBadge.innerHTML = `<span class="status-dot"></span><span class="status-text">API Offline</span>`;
   }
 }
 
-// ==============================================================
-// EVENT LISTENERS
-// ==============================================================
-
+// ─── Event Listeners ──────────────────────────────────────────────────────────
 function setupEventListeners() {
-  // Search & Filters
-  searchInput.addEventListener('input', (e) => {
+  searchInput.addEventListener('input', e => {
     currentFilter.search = e.target.value.toLowerCase().trim();
     renderFilteredOpportunities();
   });
-
-  filterStatus.addEventListener('change', (e) => {
+  filterStatus.addEventListener('change', e => {
     currentFilter.status = e.target.value;
     renderFilteredOpportunities();
   });
-
-  filterDepartment.addEventListener('change', (e) => {
+  filterDepartment.addEventListener('change', e => {
     currentFilter.department = e.target.value;
     renderFilteredOpportunities();
   });
-
   btnRefresh.addEventListener('click', () => {
     fetchOpportunities();
     showToast('Refreshing research opportunities...', 'info');
   });
-
   btnResetFilters.addEventListener('click', () => {
-    searchInput.value = '';
-    filterStatus.value = 'ALL';
-    filterDepartment.value = 'ALL';
+    searchInput.value = ''; filterStatus.value = 'ALL'; filterDepartment.value = 'ALL';
     currentFilter = { search: '', status: 'ALL', department: 'ALL' };
     renderFilteredOpportunities();
   });
 
-  // Admin Logout
-  if (btnLogoutAdmin) {
-    btnLogoutAdmin.addEventListener('click', handleAdminLogout);
-  }
+  if (btnLogoutAdmin)   btnLogoutAdmin.addEventListener('click', handleAdminLogout);
+  if (btnLogoutFaculty) btnLogoutFaculty.addEventListener('click', handleFacultyLogout);
 
-  // Modal Open/Close
   if (btnOpenCreateModal) {
     btnOpenCreateModal.addEventListener('click', () => {
-      if (!isAdmin) {
-        showToast('Administrative privileges required to post opportunities.', 'error');
+      if (currentRole !== 'admin') {
+        showToast('Administrative privileges required.', 'error');
         return;
       }
       openCreateModal();
@@ -228,616 +245,357 @@ function setupEventListeners() {
 
   btnCloseModal.addEventListener('click', () => closeModal(opportunityModal));
   btnCancelModal.addEventListener('click', () => closeModal(opportunityModal));
-  
   btnCloseDetails.addEventListener('click', () => closeModal(detailsModal));
   btnCloseDetailsBtn.addEventListener('click', () => closeModal(detailsModal));
-
   btnCancelDelete.addEventListener('click', () => closeModal(deleteModal));
-  btnConfirmDelete.addEventListener('click', () => handleConfirmDelete());
+  btnConfirmDelete.addEventListener('click', handleConfirmDelete);
 
-  // Form Submit
   opportunityForm.addEventListener('submit', handleFormSubmit);
 
-  // Close modals on escape key or clicking backdrop
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeModal(opportunityModal);
       closeModal(detailsModal);
       closeModal(deleteModal);
     }
   });
-
-  [opportunityModal, detailsModal, deleteModal].forEach(modal => {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        closeModal(modal);
-      }
-    });
+  [opportunityModal, detailsModal, deleteModal].forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) closeModal(m); });
   });
 }
 
-// ==============================================================
-// API CALLS (RESEARCH OPPORTUNITIES)
-// ==============================================================
-
-async function checkApiHealth() {
-  try {
-    const res = await fetch('/api/health');
-    const data = await res.json();
-    if (res.ok && data.status === 'online') {
-      dbStatusBadge.className = 'connection-status online';
-      dbStatusBadge.querySelector('.status-text').textContent = 'API & MySQL Connected';
-    } else {
-      dbStatusBadge.className = 'connection-status offline';
-      dbStatusBadge.querySelector('.status-text').textContent = 'Database Offline';
-    }
-  } catch (err) {
-    dbStatusBadge.className = 'connection-status offline';
-    dbStatusBadge.querySelector('.status-text').textContent = 'API Unreachable';
-  }
-}
-
+// ─── Fetch Opportunities ──────────────────────────────────────────────────────
 async function fetchOpportunities() {
-  showLoading(true);
-  try {
-    const response = await fetch(API_BASE);
-    if (!response.ok) {
-      throw new Error(`Server returned HTTP ${response.status}`);
-    }
-    const result = await response.json();
-    opportunities = result.data || [];
-    updateDepartmentFilterOptions();
-    updateMetrics();
-    renderFilteredOpportunities();
-  } catch (error) {
-    console.error('Fetch error:', error);
-    showToast(`Error connecting to API: ${error.message}`, 'error');
-    opportunities = [];
-    renderFilteredOpportunities();
-  } finally {
-    showLoading(false);
-  }
-}
-
-async function fetchSingleOpportunity(id) {
-  try {
-    const response = await fetch(`${API_BASE}/${id}`);
-    if (!response.ok) {
-      throw new Error(`Opportunity not found (Status: ${response.status})`);
-    }
-    const result = await response.json();
-    return result.data;
-  } catch (error) {
-    showToast(error.message, 'error');
-    return null;
-  }
-}
-
-// ==============================================================
-// RENDERING & UI UPDATES
-// ==============================================================
-
-function renderFilteredOpportunities() {
-  const filtered = opportunities.filter(item => {
-    const matchesSearch = !currentFilter.search || 
-      item.title.toLowerCase().includes(currentFilter.search) ||
-      item.faculty_name.toLowerCase().includes(currentFilter.search) ||
-      item.research_area.toLowerCase().includes(currentFilter.search) ||
-      item.required_skills.toLowerCase().includes(currentFilter.search);
-
-    const matchesStatus = currentFilter.status === 'ALL' || item.status === currentFilter.status;
-    const matchesDept = currentFilter.department === 'ALL' || item.department === currentFilter.department;
-
-    return matchesSearch && matchesStatus && matchesDept;
-  });
-
+  loadingIndicator.classList.remove('hidden');
   opportunitiesContainer.innerHTML = '';
-
-  if (filtered.length === 0) {
-    emptyState.classList.remove('hidden');
-    return;
-  }
-
   emptyState.classList.add('hidden');
 
-  filtered.forEach(opp => {
-    const card = createOpportunityCard(opp);
-    opportunitiesContainer.appendChild(card);
-  });
-}
-
-function createOpportunityCard(opp) {
-  const card = document.createElement('div');
-  card.className = 'opp-card';
-  card.id = `opp-card-${opp.id}`;
-
-  const isOpen = opp.status === 'Open';
-  const statusClass = isOpen ? 'open' : 'closed';
-  const toggleBtnText = isOpen ? 'Close Opening' : 'Reopen';
-
-  // Skills chips
-  const skillsArray = opp.required_skills
-    ? opp.required_skills.split(',').map(s => s.trim()).filter(Boolean)
-    : [];
-  const skillsHtml = skillsArray.slice(0, 3)
-    .map(s => `<span class="skill-pill">${escapeHtml(s)}</span>`)
-    .join('') + (skillsArray.length > 3 ? `<span class="skill-pill">+${skillsArray.length - 3} more</span>` : '');
-
-  // Role-based action bar
-  let actionButtonsHtml = '';
-  if (isAdmin) {
-    // Authenticated Admin: Full CRUD and status toggle controls
-    actionButtonsHtml = `
-      <div class="card-actions">
-        <div class="action-group-left">
-          <button class="btn btn-secondary btn-sm" onclick="viewDetails(${opp.id})">Details</button>
-          <button class="btn btn-secondary btn-sm" onclick="openEditModal(${opp.id})">Edit</button>
-          <button class="btn-toggle-status" onclick="toggleOpportunityStatus(${opp.id}, '${opp.status}')">
-            ${toggleBtnText}
-          </button>
-        </div>
-        <button class="btn btn-danger btn-sm" title="Delete Opportunity" onclick="promptDelete(${opp.id}, '${escapeQuote(opp.title)}')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-        </button>
-      </div>
-    `;
-  } else {
-    // Public Visitor Mode: Only "View Details" button, zero CRUD actions
-    actionButtonsHtml = `
-      <div class="card-actions">
-        <div class="action-group-left">
-          <button class="btn btn-secondary btn-sm" onclick="viewDetails(${opp.id})">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-            View Details
-          </button>
-        </div>
-      </div>
-    `;
+  try {
+    const res  = await fetch(API_BASE);
+    const data = await res.json();
+    if (res.ok) {
+      opportunities = data.data || [];
+      buildDepartmentFilter();
+      updateMetrics();
+      renderFilteredOpportunities();
+    } else {
+      showToast('Failed to load opportunities.', 'error');
+    }
+  } catch {
+    showToast('Network error. Could not load opportunities.', 'error');
+  } finally {
+    loadingIndicator.classList.add('hidden');
   }
-
-  card.innerHTML = `
-    <div>
-      <div class="card-top">
-        <span class="dept-badge">${escapeHtml(opp.department)}</span>
-        <span class="status-badge ${statusClass}">${escapeHtml(opp.status)}</span>
-      </div>
-
-      <h3 class="card-title">${escapeHtml(opp.title)}</h3>
-      
-      <div class="card-area">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="2" y1="12" x2="22" y2="12"></line>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-        </svg>
-        ${escapeHtml(opp.research_area)}
-      </div>
-
-      <p class="card-desc">${escapeHtml(opp.description)}</p>
-
-      <div class="card-meta-list">
-        <div class="meta-row">
-          <span class="meta-label-dim">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            Supervisor
-          </span>
-          <span class="meta-val-highlight">${escapeHtml(opp.faculty_name)}</span>
-        </div>
-
-        <div class="meta-row">
-          <span class="meta-label-dim">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            Deadline
-          </span>
-          <span class="meta-val-highlight">${escapeHtml(opp.deadline)}</span>
-        </div>
-
-        <div class="meta-row">
-          <span class="meta-label-dim">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            Positions
-          </span>
-          <span class="meta-val-highlight text-cyan">${opp.available_positions} ${opp.available_positions === 1 ? 'seat' : 'seats'}</span>
-        </div>
-      </div>
-
-      <div class="skills-preview">
-        ${skillsHtml}
-      </div>
-    </div>
-
-    ${actionButtonsHtml}
-  `;
-
-  return card;
 }
 
+// ─── Metrics ──────────────────────────────────────────────────────────────────
 function updateMetrics() {
-  statTotal.textContent = opportunities.length;
-  statOpen.textContent = opportunities.filter(o => o.status === 'Open').length;
-  statPositions.textContent = opportunities.reduce((acc, curr) => acc + (parseInt(curr.available_positions) || 0), 0);
-  
-  const depts = new Set(opportunities.map(o => o.department).filter(Boolean));
-  statDepts.textContent = depts.size;
+  const open   = opportunities.filter(o => o.status === 'Open');
+  const seats  = opportunities.reduce((s, o) => s + (parseInt(o.available_positions) || 0), 0);
+  departmentsList = new Set(opportunities.map(o => o.department).filter(Boolean));
+  statTotal.textContent    = opportunities.length;
+  statOpen.textContent     = open.length;
+  statPositions.textContent= seats;
+  statDepts.textContent    = departmentsList.size;
 }
 
-function updateDepartmentFilterOptions() {
-  const currentSelected = filterDepartment.value;
-  departmentsList = new Set(opportunities.map(o => o.department).filter(Boolean));
-
+function buildDepartmentFilter() {
+  const depts = new Set(opportunities.map(o => o.department).filter(Boolean));
+  const current = filterDepartment.value;
   filterDepartment.innerHTML = '<option value="ALL">All Departments</option>';
-  Array.from(departmentsList).sort().forEach(dept => {
+  depts.forEach(d => {
     const opt = document.createElement('option');
-    opt.value = dept;
-    opt.textContent = dept;
-    if (dept === currentSelected) opt.selected = true;
+    opt.value = d; opt.textContent = d;
+    if (d === current) opt.selected = true;
     filterDepartment.appendChild(opt);
   });
 }
 
-function showLoading(show) {
-  if (show) {
-    loadingIndicator.classList.remove('hidden');
-    opportunitiesContainer.classList.add('hidden');
-  } else {
-    loadingIndicator.classList.add('hidden');
-    opportunitiesContainer.classList.remove('hidden');
+// ─── Render Cards ─────────────────────────────────────────────────────────────
+function renderFilteredOpportunities() {
+  const filtered = opportunities.filter(o => {
+    const s = currentFilter.search;
+    const matchSearch = !s ||
+      (o.title || '').toLowerCase().includes(s) ||
+      (o.faculty_name || '').toLowerCase().includes(s) ||
+      (o.required_skills || '').toLowerCase().includes(s) ||
+      (o.department || '').toLowerCase().includes(s) ||
+      (o.research_area || '').toLowerCase().includes(s);
+    const matchStatus = currentFilter.status === 'ALL' || o.status === currentFilter.status;
+    const matchDept   = currentFilter.department === 'ALL' || o.department === currentFilter.department;
+    return matchSearch && matchStatus && matchDept;
+  });
+
+  opportunitiesContainer.innerHTML = '';
+  if (!filtered.length) {
+    emptyState.classList.remove('hidden');
+    return;
   }
+  emptyState.classList.add('hidden');
+  filtered.forEach(o => opportunitiesContainer.appendChild(buildCard(o)));
 }
 
-// ==============================================================
-// MODAL CONTROLS & CRUD OPERATIONS
-// ==============================================================
+function buildCard(o) {
+  const card = document.createElement('article');
+  card.className = 'opportunity-card';
+
+  // Determine if current user can edit/delete this card
+  // Admin: all cards | Faculty: only their own (matched by faculty_id or faculty_email)
+  let showEdit = false;
+  if (currentRole === 'admin') {
+    showEdit = true;
+  } else if (currentRole === 'faculty' && currentUser) {
+    // Compare by faculty_id stored in opportunity
+    showEdit = (o.faculty_id && o.faculty_id === currentUser.id) ||
+               (o.faculty_email && o.faculty_email === currentUser.email);
+  }
+
+  const skills = (o.required_skills || '').split(',').slice(0, 4)
+    .map(s => `<span class="skill-chip">${escapeHtml(s.trim())}</span>`).join('');
+
+  card.innerHTML = `
+    <div class="card-header-row">
+      <span class="status-badge ${o.status === 'Open' ? 'open' : 'closed'}">${o.status}</span>
+      <span class="card-id">#${o.id}</span>
+    </div>
+    <h3 class="card-title">${escapeHtml(o.title)}</h3>
+    <div class="card-meta">
+      <span class="meta-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        ${escapeHtml(o.faculty_name)}
+      </span>
+      <span class="meta-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        ${escapeHtml(o.department)}
+      </span>
+      <span class="meta-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Deadline: ${o.deadline || 'N/A'}
+      </span>
+      <span class="meta-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        ${o.available_positions} position${o.available_positions != 1 ? 's' : ''}
+      </span>
+    </div>
+    <div class="skills-row">${skills}</div>
+    <p class="card-desc">${escapeHtml((o.description || '').slice(0, 140))}${(o.description || '').length > 140 ? '…' : ''}</p>
+    <div class="card-footer-row">
+      <button class="btn btn-view" onclick="openDetailsModal(${o.id})">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        View Details
+      </button>
+      ${showEdit ? `
+        <button class="btn btn-edit-card" onclick="openEditModal(${o.id})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          Edit
+        </button>
+        <button class="btn btn-delete-card" onclick="openDeleteModal(${o.id})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          </svg>
+          Delete
+        </button>
+      ` : ''}
+    </div>
+  `;
+  return card;
+}
+
+// ─── Modal Logic ──────────────────────────────────────────────────────────────
+function openModal(modal)  { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function closeModal(modal) { modal.classList.add('hidden');    document.body.style.overflow = ''; }
+
+function clearFormErrors() {
+  ['err_oppTitle','err_oppFaculty','err_oppDepartment','err_oppArea',
+   'err_oppPositions','err_oppDeadline','err_oppStatus','err_oppSkills','err_oppDescription']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+}
 
 function openCreateModal() {
-  if (!isAdmin) {
-    showToast('Administrator privileges required.', 'error');
-    return;
-  }
   clearFormErrors();
-  opportunityForm.reset();
-  oppId.value = '';
+  oppId.value = ''; opportunityForm.reset();
   modalTitle.textContent = 'Post New Research Opportunity';
-  oppStatus.value = 'Open';
-  
-  // Set default deadline to +30 days from today
-  const nextMonth = new Date();
-  nextMonth.setDate(nextMonth.getDate() + 30);
-  oppDeadline.value = nextMonth.toISOString().split('T')[0];
-
   openModal(opportunityModal);
 }
 
-async function openEditModal(id) {
-  if (!isAdmin) {
-    showToast('Administrator privileges required.', 'error');
-    return;
-  }
+function openEditModal(id) {
+  const o = opportunities.find(x => x.id === id);
+  if (!o) return;
   clearFormErrors();
-  const opp = opportunities.find(o => o.id === id) || await fetchSingleOpportunity(id);
-  if (!opp) return;
-
-  oppId.value = opp.id;
-  oppTitle.value = opp.title;
-  oppFaculty.value = opp.faculty_name;
-  oppDepartment.value = opp.department;
-  oppArea.value = opp.research_area;
-  oppPositions.value = opp.available_positions;
-  oppDeadline.value = opp.deadline;
-  oppStatus.value = opp.status;
-  oppSkills.value = opp.required_skills;
-  oppDescription.value = opp.description;
-
-  modalTitle.textContent = `Update Opportunity #${opp.id}`;
+  oppId.value          = o.id;
+  oppTitle.value       = o.title       || '';
+  oppFaculty.value     = o.faculty_name|| '';
+  oppDepartment.value  = o.department  || '';
+  oppArea.value        = o.research_area || '';
+  oppPositions.value   = o.available_positions || '';
+  oppDeadline.value    = o.deadline    || '';
+  oppStatus.value      = o.status      || 'Open';
+  oppSkills.value      = o.required_skills || '';
+  oppDescription.value = o.description || '';
+  modalTitle.textContent = 'Edit Research Opportunity';
   openModal(opportunityModal);
 }
 
-async function viewDetails(id) {
-  const opp = opportunities.find(o => o.id === id) || await fetchSingleOpportunity(id);
-  if (!opp) return;
+function openDeleteModal(id) {
+  const o = opportunities.find(x => x.id === id);
+  if (!o) return;
+  pendingDeleteId = id;
+  deleteOppTitle.textContent = o.title;
+  openModal(deleteModal);
+}
 
-  document.getElementById('detailId').textContent = `#${opp.id}`;
-  document.getElementById('detailTitle').textContent = opp.title;
-  document.getElementById('detailFaculty').textContent = opp.faculty_name;
-  document.getElementById('detailDepartment').textContent = opp.department;
-  document.getElementById('detailArea').textContent = opp.research_area;
-  document.getElementById('detailPositions').textContent = opp.available_positions;
-  document.getElementById('detailDeadline').textContent = opp.deadline;
-  document.getElementById('detailDescription').textContent = opp.description;
+function openDetailsModal(id) {
+  const o = opportunities.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('detailStatusBadge').className = `status-badge ${o.status === 'Open' ? 'open' : 'closed'}`;
+  document.getElementById('detailStatusBadge').textContent = o.status;
+  document.getElementById('detailTitle').textContent       = o.title;
+  document.getElementById('detailFaculty').textContent     = o.faculty_name;
+  document.getElementById('detailDepartment').textContent  = o.department;
+  document.getElementById('detailArea').textContent        = o.research_area;
+  document.getElementById('detailPositions').textContent   = `${o.available_positions} position${o.available_positions != 1 ? 's' : ''}`;
+  document.getElementById('detailDeadline').textContent    = o.deadline || 'N/A';
+  document.getElementById('detailId').textContent          = `#${o.id}`;
+  document.getElementById('detailDescription').textContent = o.description;
 
-  const badge = document.getElementById('detailStatusBadge');
-  badge.textContent = opp.status;
-  badge.className = `status-badge ${opp.status === 'Open' ? 'open' : 'closed'}`;
-
-  const skillsContainer = document.getElementById('detailSkillsChips');
-  skillsContainer.innerHTML = '';
-  const skills = opp.required_skills ? opp.required_skills.split(',').map(s => s.trim()).filter(Boolean) : [];
-  skills.forEach(skill => {
-    const chip = document.createElement('span');
-    chip.className = 'skill-pill';
-    chip.textContent = skill;
-    skillsContainer.appendChild(chip);
-  });
+  const chipsContainer = document.getElementById('detailSkillsChips');
+  chipsContainer.innerHTML = (o.required_skills || '').split(',')
+    .map(s => `<span class="skill-chip">${escapeHtml(s.trim())}</span>`).join('');
 
   openModal(detailsModal);
 }
 
-// --------------------------------------------------------------
-// CREATE & UPDATE HANDLER (ADMIN ONLY)
-// --------------------------------------------------------------
+// ─── Form Submit (Create / Update) ────────────────────────────────────────────
 async function handleFormSubmit(e) {
   e.preventDefault();
   clearFormErrors();
 
-  if (!isAdmin) {
-    showToast('Authentication required. Only administrator can modify data.', 'error');
-    closeModal(opportunityModal);
-    return;
-  }
-
-  const id = oppId.value;
-  const isEditing = Boolean(id);
-
-  // Validate form fields client-side
-  let hasErrors = false;
-
-  const payload = {
-    title: oppTitle.value.trim(),
-    faculty_name: oppFaculty.value.trim(),
-    department: oppDepartment.value.trim(),
-    research_area: oppArea.value.trim(),
-    available_positions: parseInt(oppPositions.value, 10),
-    deadline: oppDeadline.value.trim(),
-    status: oppStatus.value,
-    required_skills: oppSkills.value.trim(),
-    description: oppDescription.value.trim()
+  const id       = oppId.value;
+  const payload  = {
+    title:               oppTitle.value.trim(),
+    faculty_name:        oppFaculty.value.trim(),
+    department:          oppDepartment.value.trim(),
+    research_area:       oppArea.value.trim(),
+    available_positions: parseInt(oppPositions.value),
+    deadline:            oppDeadline.value,
+    status:              oppStatus.value,
+    required_skills:     oppSkills.value.trim(),
+    description:         oppDescription.value.trim()
   };
 
-  if (!payload.title) {
-    setError('err_oppTitle', 'Research Title is required.');
-    hasErrors = true;
-  }
-  if (!payload.faculty_name) {
-    setError('err_oppFaculty', 'Faculty Member Name is required.');
-    hasErrors = true;
-  }
-  if (!payload.department) {
-    setError('err_oppDepartment', 'Department is required.');
-    hasErrors = true;
-  }
-  if (!payload.research_area) {
-    setError('err_oppArea', 'Research Area is required.');
-    hasErrors = true;
-  }
-  if (isNaN(payload.available_positions) || payload.available_positions <= 0) {
-    setError('err_oppPositions', 'Positions must be at least 1.');
-    hasErrors = true;
-  }
-  if (!payload.deadline) {
-    setError('err_oppDeadline', 'Valid application deadline is required.');
-    hasErrors = true;
-  }
-  if (!payload.required_skills) {
-    setError('err_oppSkills', 'Please specify required skills.');
-    hasErrors = true;
-  }
-  if (!payload.description) {
-    setError('err_oppDescription', 'Research Description is required.');
-    hasErrors = true;
-  }
+  // Validate
+  let valid = true;
+  const setErr = (elId, msg) => { const el = document.getElementById(elId); if (el) { el.textContent = msg; valid = false; } };
+  if (!payload.title)               setErr('err_oppTitle',       'Title is required.');
+  if (!payload.faculty_name)        setErr('err_oppFaculty',     'Faculty name is required.');
+  if (!payload.department)          setErr('err_oppDepartment',  'Department is required.');
+  if (!payload.research_area)       setErr('err_oppArea',        'Research area is required.');
+  if (!payload.available_positions || payload.available_positions <= 0)
+                                    setErr('err_oppPositions',   'Must be a positive number.');
+  if (!payload.deadline)            setErr('err_oppDeadline',    'Deadline is required.');
+  if (!payload.required_skills)     setErr('err_oppSkills',      'Required skills are required.');
+  if (!payload.description)         setErr('err_oppDescription', 'Description is required.');
+  if (!valid) return;
 
-  if (hasErrors) return;
+  const isEdit = !!id;
+  const url    = isEdit ? `${API_BASE}/${id}` : API_BASE;
+  const method = isEdit ? 'PUT' : 'POST';
 
   const submitBtn = document.getElementById('btnSubmitOpp');
   submitBtn.disabled = true;
-  submitBtn.textContent = isEditing ? 'Updating...' : 'Saving...';
 
   try {
-    const url = isEditing ? `${API_BASE}/${id}` : API_BASE;
-    const method = isEditing ? 'PUT' : 'POST';
-
-    const response = await fetch(url, {
-      method: method,
-      headers: getAuthHeaders(),
-      credentials: 'include',
+    const res  = await fetch(url, {
+      method, headers: getAuthHeaders(), credentials: 'include',
       body: JSON.stringify(payload)
     });
+    const data = await res.json();
 
-    const data = await response.json();
-
-    if (response.status === 401) {
-      showToast('Admin session expired. Please log in again.', 'error');
-      isAdmin = false;
-      updateRoleUI(false);
-      renderFilteredOpportunities();
-      closeModal(opportunityModal);
+    if (!res.ok) {
+      showToast(data.message || 'Operation failed.', 'error');
       return;
-    }
-
-    if (!response.ok) {
-      throw new Error(data.message || `Server error ${response.status}`);
     }
 
     closeModal(opportunityModal);
-    showToast(isEditing ? 'Opportunity updated successfully!' : 'New research opportunity published!', 'success');
+    showToast(isEdit ? 'Opportunity updated!' : 'Opportunity created!', 'success');
     await fetchOpportunities();
-
-  } catch (error) {
-    showToast(`Failed: ${error.message}`, 'error');
+  } catch {
+    showToast('Network error. Please try again.', 'error');
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Save Opportunity';
   }
 }
 
-// --------------------------------------------------------------
-// QUICK STATUS TOGGLE (ADMIN ONLY)
-// --------------------------------------------------------------
-async function toggleOpportunityStatus(id, currentStatus) {
-  if (!isAdmin) {
-    showToast('Administrator privileges required to change opportunity status.', 'error');
-    return;
-  }
-
-  const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
-  try {
-    const response = await fetch(`${API_BASE}/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      credentials: 'include',
-      body: JSON.stringify({ status: newStatus })
-    });
-
-    const data = await response.json();
-    if (response.status === 401) {
-      showToast('Unauthorized. Session expired.', 'error');
-      isAdmin = false;
-      updateRoleUI(false);
-      renderFilteredOpportunities();
-      return;
-    }
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Status update failed.');
-    }
-
-    showToast(`Opportunity #${id} is now ${newStatus}`, 'success');
-    await fetchOpportunities();
-  } catch (error) {
-    showToast(`Could not update status: ${error.message}`, 'error');
-  }
-}
-
-// --------------------------------------------------------------
-// DELETE ACTIONS (ADMIN ONLY)
-// --------------------------------------------------------------
-function promptDelete(id, title) {
-  if (!isAdmin) {
-    showToast('Administrator privileges required to delete opportunities.', 'error');
-    return;
-  }
-  pendingDeleteId = id;
-  deleteOppTitle.textContent = `"${title}"`;
-  openModal(deleteModal);
-}
-
+// ─── Delete ───────────────────────────────────────────────────────────────────
 async function handleConfirmDelete() {
-  if (!isAdmin || !pendingDeleteId) return;
-
-  const btnConfirm = document.getElementById('btnConfirmDelete');
-  btnConfirm.disabled = true;
-  btnConfirm.textContent = 'Deleting...';
+  if (!pendingDeleteId) return;
+  btnConfirmDelete.disabled = true;
 
   try {
-    const response = await fetch(`${API_BASE}/${pendingDeleteId}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-      credentials: 'include'
+    const res  = await fetch(`${API_BASE}/${pendingDeleteId}`, {
+      method: 'DELETE', headers: getAuthHeaders(), credentials: 'include'
     });
+    const data = await res.json();
 
-    const data = await response.json();
-    if (response.status === 401) {
-      showToast('Unauthorized. Session expired.', 'error');
-      isAdmin = false;
-      updateRoleUI(false);
-      closeModal(deleteModal);
+    if (!res.ok) {
+      showToast(data.message || 'Delete failed.', 'error');
       return;
     }
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to delete opportunity.');
-    }
-
     closeModal(deleteModal);
-    showToast(`Opportunity #${pendingDeleteId} deleted permanently.`, 'success');
+    showToast('Opportunity deleted successfully.', 'success');
     pendingDeleteId = null;
     await fetchOpportunities();
-
-  } catch (error) {
-    showToast(`Delete failed: ${error.message}`, 'error');
+  } catch {
+    showToast('Network error. Please try again.', 'error');
   } finally {
-    btnConfirm.disabled = false;
-    btnConfirm.textContent = 'Confirm Delete';
+    btnConfirmDelete.disabled = false;
   }
 }
 
-// ==============================================================
-// HELPERS, MODAL CONTROLLER & TOASTS
-// ==============================================================
-
-function openModal(modal) {
-  modal.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeModal(modal) {
-  modal.classList.add('hidden');
-  document.body.style.overflow = '';
-}
-
-function setError(elementId, message) {
-  const el = document.getElementById(elementId);
-  if (el) el.textContent = message;
-}
-
-function clearFormErrors() {
-  document.querySelectorAll('.field-error').forEach(el => el.textContent = '');
-}
-
+// ─── Toast ────────────────────────────────────────────────────────────────────
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const iconMap = {
+    success: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+    error:   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    info:    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+  };
+
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-
-  const iconSvg = type === 'success' 
-    ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`
-    : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
-
-  toast.innerHTML = `
-    ${iconSvg}
-    <span>${escapeHtml(message)}</span>
-  `;
-
+  toast.innerHTML = `${iconMap[type] || iconMap.info}<span>${escapeHtml(message)}</span>`;
   container.appendChild(toast);
-
   setTimeout(() => {
     toast.style.opacity = '0';
-    toast.style.transform = 'translateX(30px)';
-    toast.style.transition = 'all 0.3s ease';
+    toast.style.transform = 'translateX(20px)';
+    toast.style.transition = 'all .3s ease';
     setTimeout(() => toast.remove(), 300);
   }, 3500);
 }
 
+// ─── Utility ──────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function escapeQuote(str) {
-  if (!str) return '';
-  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
 }

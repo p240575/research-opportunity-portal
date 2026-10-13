@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAST-NUCES | Faculty Sign In</title>
+  <meta name="description" content="Faculty member login to manage university research opportunity posts.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0a0e17;--card:rgba(17,24,39,.9);--border:rgba(255,255,255,.12);--text:#f8fafc;--muted:#94a3b8;--dim:#64748b;--indigo:#6366f1;--indigo-d:#4f46e5;--cyan:#06b6d4;--emerald:#10b981;--rose:#f43f5e;--font:'Plus Jakarta Sans',system-ui,sans-serif;--r-sm:8px;--r-md:14px;--r-lg:20px;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+    .glow{position:fixed;border-radius:50%;filter:blur(140px);pointer-events:none;z-index:0;opacity:.32;}
+    .g1{width:500px;height:500px;background:radial-gradient(circle,#6366f1,transparent 70%);top:-150px;right:-100px;}
+    .g2{width:450px;height:450px;background:radial-gradient(circle,#06b6d4,transparent 70%);bottom:50px;left:-150px;}
+    .app-header{position:sticky;top:0;z-index:40;background:rgba(10,14,23,.85);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);}
+    .hdr{max-width:1200px;margin:0 auto;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;}
+    .brand a{display:flex;align-items:center;gap:.85rem;text-decoration:none;}
+    .logo-box{width:42px;height:42px;background:linear-gradient(135deg,var(--indigo),var(--cyan));border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 15px rgba(99,102,241,.4);}
+    .u-tag{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--cyan);display:block;}
+    .p-title{font-size:1.2rem;font-weight:700;letter-spacing:-.02em;background:linear-gradient(to right,#fff,#cbd5e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;padding:.55rem 1rem;font-size:.85rem;font-weight:600;border-radius:var(--r-md);border:none;cursor:pointer;transition:all .2s;font-family:inherit;text-decoration:none;}
+    .btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f0;border:1px solid var(--border);}
+    .btn-ghost:hover{background:rgba(255,255,255,.12);color:#fff;}
+    .btn-sm{padding:.38rem .75rem;font-size:.78rem;border-radius:var(--r-sm);}
+    .page{flex:1;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem;position:relative;z-index:10;}
+    .card{background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--r-lg);max-width:430px;width:100%;padding:2.25rem 2rem;box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 45px rgba(99,102,241,.2);position:relative;overflow:hidden;animation:slideUp .35s cubic-bezier(.16,1,.3,1);}
+    @keyframes slideUp{from{opacity:0;transform:translateY(22px) scale(.97)}to{opacity:1;transform:none}}
+    .card::before{content:'';position:absolute;top:0;left:0;width:100%;height:4px;background:linear-gradient(90deg,var(--indigo),var(--cyan),#a855f7);}
+    .card-hdr{text-align:center;margin-bottom:1.75rem;}
+    .card-icon{width:56px;height:56px;background:linear-gradient(135deg,var(--indigo),var(--cyan));border-radius:var(--r-md);margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 25px rgba(99,102,241,.4);}
+    .card-title{font-size:1.4rem;font-weight:800;letter-spacing:-.02em;color:#fff;margin-bottom:.25rem;}
+    .card-sub{font-size:.83rem;color:var(--muted);line-height:1.45;}
+    .form-group{margin-bottom:1.1rem;}
+    label{display:block;font-size:.8rem;font-weight:600;color:#cbd5e1;margin-bottom:.4rem;}
+    .req{color:var(--rose);}
+    .field{width:100%;padding:.65rem .9rem;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-md);color:#fff;font-size:.88rem;font-family:inherit;transition:all .2s;}
+    .field:focus{outline:none;border-color:var(--indigo);background:rgba(255,255,255,.07);box-shadow:0 0 0 3px rgba(99,102,241,.25);}
+    .field::placeholder{color:var(--dim);}
+    .pw-wrap{position:relative;}
+    .pw-wrap .field{padding-right:2.6rem;}
+    .pw-toggle{position:absolute;right:.7rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--dim);cursor:pointer;display:flex;align-items:center;transition:color .2s;}
+    .pw-toggle:hover{color:#fff;}
+    .btn-primary{background:linear-gradient(135deg,var(--indigo),var(--indigo-d));color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.35);}
+    .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,var(--indigo-d),#4338ca);transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.5);}
+    .btn-primary:disabled{opacity:.6;cursor:not-allowed;}
+    .w-full{width:100%;}
+    .alert{padding:.8rem 1rem;border-radius:var(--r-md);font-size:.83rem;display:flex;align-items:flex-start;gap:.6rem;margin-bottom:1.1rem;}
+    .alert.danger{background:rgba(244,63,94,.15);border:1px solid rgba(244,63,94,.35);color:#fecdd3;}
+    .alert.success{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35);color:#a7f3d0;}
+    .hidden{display:none!important;}
+    .divider{display:flex;align-items:center;gap:.75rem;margin:1.25rem 0;}
+    .divider-line{flex:1;height:1px;background:var(--border);}
+    .divider-text{font-size:.75rem;color:var(--dim);}
+    .card-footer{text-align:center;margin-top:.5rem;font-size:.83rem;color:var(--muted);}
+    .card-footer a{color:var(--cyan);text-decoration:none;font-weight:600;}
+    .card-footer a:hover{text-decoration:underline;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div class="glow g1"></div>
+  <div class="glow g2"></div>
+
+  <header class="app-header">
+    <div class="hdr">
+      <div class="brand">
+        <a href="/">
+          <div class="logo-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div>
+            <span class="u-tag">FAST-NUCES Peshawar</span>
+            <span class="p-title">Research Opportunity Portal</span>
+          </div>
+        </a>
+      </div>
+      <div style="display:flex;gap:.6rem;align-items:center;">
+        <a href="/faculty/register" class="btn btn-ghost btn-sm">Register</a>
+        <a href="/" class="btn btn-ghost btn-sm">← Public Portal</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="card">
+
+      <div class="card-hdr">
+        <div class="card-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <span class="u-tag">Faculty Member</span>
+        <h1 class="card-title">Sign In</h1>
+        <p class="card-sub">Access your dashboard to manage research opportunities</p>
+      </div>
+
+      <div id="alertBox" class="alert danger hidden">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span id="alertText"></span>
+      </div>
+
+      <form id="loginForm" novalidate>
+
+        <div class="form-group">
+          <label for="email">University Email <span class="req">*</span></label>
+          <input class="field" id="email" type="email" placeholder="e.g. tariq.khan@nu.edu.pk" autocomplete="email" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password <span class="req">*</span></label>
+          <div class="pw-wrap">
+            <input class="field" id="password" type="password" placeholder="Your password" autocomplete="current-password" required>
+            <button type="button" class="pw-toggle" id="pwToggle">
+              <svg id="eyeIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn btn-primary w-full" style="height:46px;margin-top:.5rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          Sign In as Faculty
+        </button>
+
+      </form>
+
+      <div class="divider">
+        <div class="divider-line"></div>
+        <span class="divider-text">No account yet?</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <div class="card-footer">
+        <a href="/faculty/register">Create a faculty account →</a>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    const eyeSVG    = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    const eyeOffSVG = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+
+    document.getElementById('pwToggle').addEventListener('click', () => {
+      const inp = document.getElementById('password');
+      const isPass = inp.type === 'password';
+      inp.type = isPass ? 'text' : 'password';
+      document.getElementById('eyeIcon').innerHTML = isPass ? eyeOffSVG : eyeSVG;
+    });
+
+    function showAlert(msg, type = 'danger') {
+      const box = document.getElementById('alertBox');
+      box.className = `alert ${type}`;
+      document.getElementById('alertText').textContent = msg;
+      box.classList.remove('hidden');
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      document.getElementById('alertBox').classList.add('hidden');
+
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!email || !password) {
+        showAlert('Please enter your email and password.', 'danger');
+        return;
+      }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = `<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></span>&nbsp;Signing in...`;
+
+      try {
+        const res  = await fetch('/api/faculty/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showAlert(data.message || 'Invalid credentials.', 'danger');
+          return;
+        }
+
+        // Persist token
+        if (data.token) {
+          localStorage.setItem('faculty_token', data.token);
+          localStorage.setItem('faculty_user', JSON.stringify(data.faculty));
+        }
+
+        showAlert('Authenticated! Redirecting to dashboard...', 'success');
+        setTimeout(() => window.location.href = '/faculty/dashboard', 700);
+      } catch (err) {
+        showAlert('Network error. Please try again.', 'danger');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Sign In as Faculty`;
+      }
+    });
+  </script>
+</body>
+</html>
