@@ -7,15 +7,14 @@
 
 ## 🔗 GitHub Repository
 
-> **https://github.com/p240575/research-opportunity-portal**  
-> *(Replace with your actual GitHub link after pushing)*
+> **https://github.com/p240575/research-opportunity-portal**
 
 ---
 
 ## 📹 Demonstration Video
 
-> **[Watch 1-Minute Demo](#)**  
-> *(Replace `#` with your video link — YouTube, Google Drive, or Loom)*
+> **Link:** https://drive.google.com/file/d/1fUg0j8MDkAZovVXExRhVCs_xRKUCwEG1/view?usp=drive_link  
+> **[Watch 1-Minute Demonstration Video](https://drive.google.com/file/d/1fUg0j8MDkAZovVXExRhVCs_xRKUCwEG1/view?usp=drive_link)**
 
 ---
 
@@ -108,7 +107,7 @@ http://127.0.0.1:5000
 | Field    | Value   |
 |----------|---------|
 | Username | `admin` |
-| Password | *(set during first run — see terminal output)* |
+| Password | `Password not shared` |
 
 Admin panel: `http://127.0.0.1:5000/admin/login`
 
