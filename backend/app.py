@@ -145,7 +145,7 @@ def serve_admin_assets(filename):
     fp = os.path.join(app.static_folder, filename)
     if os.path.exists(fp):
         return send_from_directory(app.static_folder, filename)
-    return send_from_directory(app.static_folder, "admin-login.html")
+    return send_from_directory(app.static_folder, "404.html"), 404
 
 # ---------------------------------------------------------------------------
 # Health Check
@@ -598,12 +598,19 @@ def delete_opportunity(opp_id):
 # ---------------------------------------------------------------------------
 # Error handlers
 # ---------------------------------------------------------------------------
+# Known valid frontend routes — any other path returns a real 404
+_VALID_FRONTEND_ROUTES = {
+    "/", "/login", "/admin/login",
+    "/faculty/register", "/faculty/login", "/faculty/dashboard",
+}
+
 @app.errorhandler(404)
 def route_not_found(e):
     if request.path.startswith("/api/"):
         return jsonify({"error": "Not Found",
                         "message": f"Endpoint '{request.path}' not found."}), 404
-    return send_from_directory(app.static_folder, "index.html")
+    # Serve actual 404 page for unknown frontend paths
+    return send_from_directory(app.static_folder, "404.html"), 404
 
 @app.errorhandler(405)
 def method_not_allowed(e):

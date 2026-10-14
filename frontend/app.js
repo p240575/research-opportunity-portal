@@ -350,12 +350,10 @@ function renderFilteredOpportunities() {
         o.title,
         o.description,
         o.faculty_name,
-        o.faculty_account_name,
         o.faculty_email,
         o.department,
         o.research_area,
         o.required_skills,
-        o.status,
         String(o.id),
         '#' + o.id
       ].filter(Boolean).join(' ').toLowerCase();

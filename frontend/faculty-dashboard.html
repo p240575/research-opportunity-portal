@@ -456,7 +456,7 @@
         if (!searchWords.length) return true;
         const haystack = [
           o.title, o.description, o.research_area, o.department,
-          o.required_skills, o.status, String(o.id), '#' + o.id
+          o.required_skills, String(o.id), '#' + o.id
         ].filter(Boolean).join(' ').toLowerCase();
         return searchWords.every(w => haystack.includes(w));
       });
