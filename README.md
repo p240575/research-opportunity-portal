@@ -52,10 +52,7 @@ mysql -u root -p < database/schema.sql
 ```
 
 ### 3. Configure environment variables
-```bash
-cp .env.example .env
-```
-Open `.env` and fill in your MySQL credentials:
+Create a `.env` file in the project root with your MySQL credentials:
 ```
 DB_HOST=localhost
 DB_PORT=3306
@@ -101,7 +98,6 @@ http://127.0.0.1:5000
 │   └── style.css
 ├── ResearchPortal_API_Tests.postman_collection.json
 ├── requirements.txt
-├── .env.example
 └── README.md
 ```
 
@@ -136,5 +132,5 @@ The collection covers all 8 required scenarios:
 
 ## 🛡️ Security Note
 
-Never commit `.env` to GitHub. Real credentials are excluded via `.gitignore`.  
-Use `.env.example` as a template only.
+Never commit `.env` or sensitive credentials to GitHub.
+
