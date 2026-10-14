@@ -128,9 +128,3 @@ The collection covers all 8 required scenarios:
 7. Request deleted opportunity → 404
 8. Invalid data → 400 validation error
 
----
-
-## 🛡️ Security Note
-
-Never commit `.env` or sensitive credentials to GitHub.
-
