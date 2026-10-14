@@ -7,7 +7,7 @@
 
 ## 🔗 GitHub Repository
 
-> **https://github.com/YOUR_USERNAME/research-opportunity-portal**  
+> **https://github.com/p240575/research-opportunity-portal**  
 > *(Replace with your actual GitHub link after pushing)*
 
 ---
@@ -42,7 +42,7 @@ A full-stack web portal where faculty post research opportunities and students b
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/research-opportunity-portal.git
+git clone https://github.com/p240575/research-opportunity-portal.git
 cd research-opportunity-portal
 ```
 
